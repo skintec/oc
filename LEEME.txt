@@ -1,0 +1,48 @@
+COTIZADOR SKINTEC — cómo publicar / actualizar
+================================================
+
+Esta carpeta contiene tu cotizador (index.html) listo para GitHub Pages,
+más un script (deploy.command) que sube los cambios automáticamente.
+
+PRIMERA VEZ
+-----------
+1. Si el repositorio "cotizadorskintec" todavía NO existe en tu GitHub:
+   → Ve a https://github.com/new
+   → Nombre del repositorio: cotizadorskintec
+   → Déjalo vacío (NO marques "Add a README")
+   → Crear repositorio
+
+2. Haz doble clic en "deploy.command" (si tu Mac lo abre como texto en vez de
+   ejecutarlo, haz clic derecho → Abrir, la primera vez).
+   Te pedirá tu usuario y clave/token de GitHub la primera vez: es normal,
+   los maneja tu computador directamente con GitHub, este script no los ve ni los guarda.
+
+3. Cuando termine, entra una sola vez a:
+   https://github.com/javimolin-rgb/cotizadorskintec/settings/pages
+   y en "Branch" elige "main" / "(root)" y guarda.
+
+4. Tu cotizador quedará publicado en:
+   https://javimolin-rgb.github.io/cotizadorskintec/
+   (puede tardar 1-2 minutos en aparecer la primera vez)
+
+PARA ACTUALIZARLO DESPUÉS
+--------------------------
+Cada vez que quieras subir cambios (por ejemplo si te envío una nueva
+versión de index.html), solo reemplaza el archivo index.html en esta
+carpeta y vuelve a hacer doble clic en deploy.command.
+
+SOBRE EL CATÁLOGO DE PRODUCTOS
+-------------------------------
+El catálogo de productos (panel "Gestionar catálogo") se guarda en el
+navegador de cada computador, no en GitHub. Si trabajas desde más de un
+computador o navegador, usa los botones "exportar catálogo" e
+"importar catálogo" dentro del cotizador para mantenerlos iguales.
+
+ÓRDENES DE COMPRA
+-----------------
+Arriba hay dos pestañas: "Cotizaciones" y "Órdenes de compra".
+En "Órdenes de compra" llenas los datos del proveedor, los productos
+(puedes elegirlos del mismo catálogo; se completan con el Precio Base
+como precio de compra, editable) y las condiciones, y descargas el PDF
+en versión color o para imprimir. El N° se sugiere como OC-AAMMDD-NN.
+Los proveedores usados se recuerdan en este navegador para autocompletar.
