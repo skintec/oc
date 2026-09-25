@@ -103,6 +103,8 @@
   nav.tabs button:hover{color:var(--azul-oscuro);}
   nav.tabs button.activa{color:var(--azul-oscuro); border-bottom-color:var(--rojo);}
   .tab-panel[hidden]{display:none;}
+  .cliente-mana{display:grid; grid-template-columns:1fr 130px; gap:10px;}
+  input[hidden]{display:none;}
 </style>
 </head>
 <body>
@@ -143,7 +145,19 @@
       <div><label>Validez cotización</label><input type="text" id="f_validez" value="5 días"></div>
     </div>
     <div class="grid cols-2" style="margin-top:14px;">
-      <div><label>Cliente / Razón social</label><input type="text" id="f_cliente" placeholder="Ej: Constructora Ejemplo Ltda."></div>
+      <div class="cliente-mana">
+        <div><label>Cliente / Razón social</label><input type="text" id="f_cliente" placeholder="Ej: Constructora Ejemplo Ltda."></div>
+        <div><label title="Solo se usa en el nombre del archivo PDF">Maña</label>
+          <select id="f_mana" onchange="onManaChange()">
+            <option value="">—</option>
+            <option>PFS</option><option>PVN</option><option>PB</option><option>CI</option>
+            <option>BA</option><option>PYC</option><option>PCL</option><option>LM</option>
+            <option>PLM</option><option>FLM</option><option>CLM</option>
+            <option value="__otro">Otro…</option>
+          </select>
+          <input type="text" id="f_mana_otro" placeholder="Escribe la maña" hidden style="margin-top:4px;">
+        </div>
+      </div>
       <div><label>RUT</label><input type="text" id="f_rut" placeholder="Ej: 76.123.456-7"></div>
       <div><label>Atención (contacto)</label><input type="text" id="f_atencion" placeholder="Ej: Sr(a). Nombre Apellido"></div>
       <div><label>Correo</label><input type="email" id="f_correo" placeholder="correo@cliente.cl"></div>
@@ -167,7 +181,7 @@
         <tr>
           <th style="width:9%">Archivo</th>
           <th style="width:13%">Categoría</th>
-          <th style="width:20%">Producto</th>
+          <th style="width:20%">Producto / Descripción</th>
           <th style="width:6%">Unidad</th>
           <th style="width:9%">Precio Base</th>
           <th style="width:7%">% Rec.</th>
@@ -216,6 +230,12 @@
     </div>
   </div>
 
+  <!-- OBSERVACIONES -->
+  <div class="card">
+    <h2>4 · Comentarios u observaciones <span class="h2-extra">Opcional · se incluye en el PDF</span></h2>
+    <textarea id="f_obs" rows="4" placeholder="Ej: Precios sujetos a variación según disponibilidad de stock."></textarea>
+  </div>
+
   <!-- ACCIONES -->
   <div class="acciones">
     <button class="btn btn-primary" onclick="descargarPDF('color')">📄 Descargar PDF para Cliente (color)</button>
@@ -239,6 +259,9 @@
       <div><label>Ref. cotización proveedor</label><input type="text" id="oc_ref" placeholder="Ej: Cot. N° 1234"></div>
     </div>
     <div class="grid cols-2" style="margin-top:14px;">
+      <div style="grid-column:1 / -1;"><label>Proveedor frecuente (rellena los datos automáticamente)</label>
+        <select id="oc_proveedor_sel" onchange="onProveedorSelect(this.value)"></select>
+      </div>
       <div><label>Proveedor / Razón social</label>
         <input type="text" id="oc_proveedor" list="lista_proveedores" placeholder="Ej: Distribuidora Ejemplo SpA" onchange="onProveedorChange(this.value)">
         <datalist id="lista_proveedores"></datalist>
@@ -293,10 +316,15 @@
       <div><label>Condiciones de pago</label><input type="text" id="oc_pago" value="Transferencia bancaria contra factura."></div>
       <div><label>Enviar factura a</label><input type="email" id="oc_correo_factura" value="ventas@skintec.cl"></div>
     </div>
-    <div style="margin-top:14px;"><label>Observaciones</label><textarea id="oc_obs" rows="3" placeholder="Ej: Indicar N° de OC en la factura y guía de despacho."></textarea></div>
     <div style="margin-top:14px;"><label>Datos de facturación (se incluyen fijos en el PDF)</label>
       <input type="text" disabled value="SKINTEC SPA · RUT 78.276.130-7">
     </div>
+  </div>
+
+  <!-- OBSERVACIONES -->
+  <div class="card">
+    <h2>4 · Comentarios u observaciones <span class="h2-extra">Opcional · se incluye en el PDF</span></h2>
+    <textarea id="oc_obs" rows="4" placeholder="Ej: Indicar N° de OC en la factura y guía de despacho."></textarea>
   </div>
 
   <!-- ACCIONES -->
@@ -511,7 +539,6 @@ function etiquetaProducto(p){
 
 /* ============ MARGEN / PRECIO FINAL ============ */
 function precioFinalDeItem(it){
-  if(it.personalizado) return Number(it.precio)||0;
   const base = Number(it.precioBase)||0;
   const margen = Number(it.margen)||0;
   return Math.round(base * (1 + margen/100));
@@ -521,9 +548,9 @@ function onCambioMargenGlobal(){
   localStorage.setItem(LS_MARGEN_DEFAULT, String(margenGlobalDefault));
 }
 function aplicarMargenATodas(){
-  items.forEach(it=>{ if(!it.personalizado) it.margen = margenGlobalDefault; });
+  items.forEach(it=>{ it.margen = margenGlobalDefault; });
   renderItems();
-  toast("Se aplicó " + margenGlobalDefault + "% a todas las líneas del catálogo.");
+  toast("Se aplicó " + margenGlobalDefault + "% a todas las líneas.");
 }
 
 /* ============ ITEMS DE LA COTIZACIÓN ============ */
@@ -622,7 +649,7 @@ function renderItems(){
       tr.innerHTML = `
         <td colspan="2"><span style="font-size:12px; color:var(--gris);">Personalizado</span></td>
         <td>
-          <input type="text" placeholder="Nombre del producto" value="${escapeAttr(it.nombre)}" onchange="onCampoItem(${it.uid},'nombre',this.value)" style="margin-bottom:4px;">
+          <input type="text" placeholder="Descripción del producto" value="${escapeAttr(it.nombre)}" onchange="onCampoItem(${it.uid},'nombre',this.value)" style="margin-bottom:4px;">
           <input type="text" placeholder="Formato (opcional)" value="${escapeAttr(it.formato)}" onchange="onCampoItem(${it.uid},'formato',this.value)">
         </td>
         <td>
@@ -630,9 +657,9 @@ function renderItems(){
             ${["un","m2","rollo","gl","kg","m","unidad"].map(u=>`<option value="${u}" ${it.unidad===u?'selected':''}>${u}</option>`).join("")}
           </select>
         </td>
-        <td class="celda-base">—</td>
-        <td>—</td>
-        <td><input type="number" min="0" step="1" value="${it.precio}" onchange="onCampoItem(${it.uid},'precio',this.value)"></td>
+        <td><input type="number" min="0" step="1" value="${it.precioBase}" onchange="onCampoItem(${it.uid},'precioBase',this.value)"></td>
+        <td><input type="number" min="0" step="0.5" value="${it.margen}" onchange="onCampoItem(${it.uid},'margen',this.value)"></td>
+        <td class="celda-final">${formatoCLP(pf)}</td>
         <td><input type="number" min="0" step="1" value="${it.cantidad}" onchange="onCampoItem(${it.uid},'cantidad',this.value)"></td>
         <td class="celda-total">${formatoCLP(it.cantidad*pf)}</td>
         <td class="col-del"><button class="btn-del" onclick="quitarItem(${it.uid})" title="Quitar">✕</button></td>`;
@@ -806,8 +833,20 @@ function datosFormulario(){
     correo: document.getElementById('f_correo').value.trim(),
     plazo: document.getElementById('f_plazo').value.trim(),
     lugar: document.getElementById('f_lugar').value.trim(),
-    pago: document.getElementById('f_pago').value.trim()
+    pago: document.getElementById('f_pago').value.trim(),
+    obs: document.getElementById('f_obs').value.trim(),
+    mana: valorMana()
   };
+}
+function onManaChange(){
+  const otro = document.getElementById('f_mana').value === "__otro";
+  const inp = document.getElementById('f_mana_otro');
+  inp.hidden = !otro;
+  if(otro) inp.focus();
+}
+function valorMana(){
+  const v = document.getElementById('f_mana').value;
+  return v === "__otro" ? document.getElementById('f_mana_otro').value.trim() : v;
 }
 function validarAntesDeDescargar(d){
   if(!items.length){ alert("Agrega al menos un producto antes de descargar la cotización."); return false; }
@@ -830,8 +869,11 @@ function descargarPDF(modo){
   const azulFondo = [235,242,248];
 
   const PAG_W = doc.internal.pageSize.getWidth();
+  const PAG_H = doc.internal.pageSize.getHeight();
   const M = 15; // margen izquierdo/derecho
   const ANCHO = PAG_W - M*2;
+  const LIMITE = PAG_H - 18; // deja espacio para el pie de página
+  const asegurarEspacio = (y, alto) => { if(y + alto > LIMITE){ doc.addPage(); return 22; } return y; };
 
   // ---- Encabezado ----
   try{ doc.addImage(document.getElementById('logo_fuente').src, 'PNG', M, 18, 42, 9.9); }catch(e){}
@@ -881,10 +923,11 @@ function descargarPDF(modo){
                        : { fillColor:[255,255,255], textColor: negro, fontStyle:"bold", lineWidth:0.3, lineColor:[0,0,0], fontSize:9 },
     alternateRowStyles: color ? { fillColor:[246,249,252] } : { fillColor:[255,255,255] },
     columnStyles:{ 0:{cellWidth:13, halign:"center"}, 1:{cellWidth:86}, 2:{cellWidth:16, halign:"center"}, 3:{cellWidth:16, halign:"center"}, 4:{cellWidth:27, halign:"right"}, 5:{cellWidth:27, halign:"right"} },
-    margin:{left:M, right:M}
+    margin:{left:M, right:M, bottom:18}
   });
 
-  let y2 = doc.lastAutoTable.finalY + 6;
+  let y2 = asegurarEspacio(doc.lastAutoTable.finalY + 6, 26);
+  if(y2 === 22) y2 += 6;
 
   // ---- Totales ----
   const anchoBox = 78;
@@ -905,6 +948,7 @@ function descargarPDF(modo){
   y2 += 26;
 
   // ---- Condiciones comerciales ----
+  y2 = asegurarEspacio(y2, 20);
   doc.setFont("helvetica","bold"); doc.setFontSize(11.5);
   doc.setTextColor(...(color?azulOsc:negro));
   doc.text("CONDICIONES COMERCIALES", M, y2);
@@ -920,14 +964,18 @@ function descargarPDF(modo){
   ];
   condiciones.forEach(([label, valor])=>{
     const texto = doc.splitTextToSize(valor, 138);
+    y2 = asegurarEspacio(y2, 5.6*texto.length);
     doc.setFont("helvetica","bold"); doc.text(label, M, y2);
     doc.setFont("helvetica","normal"); doc.text(":", M+46, y2);
     doc.text(texto, M+50, y2);
     y2 += 5.6 * texto.length + 1.2;
   });
 
+  // ---- Comentarios u observaciones ----
+  if(d.obs) y2 = dibujarObservacionesPDF(doc, d.obs, y2 + 3, {M, ANCHO, color, azulOsc, rojo, negro, asegurarEspacio});
+
   // ---- Datos bancarios ----
-  y2 += 3;
+  y2 = asegurarEspacio(y2 + 3, 15);
   if(color){ doc.setFillColor(248,249,250); doc.rect(M, y2, ANCHO, 15, "F"); }
   doc.setDrawColor(...(color?azul:negro)); doc.setLineWidth(0.25);
   doc.rect(M, y2, ANCHO, 15);
@@ -941,11 +989,11 @@ function descargarPDF(modo){
   doc.setFontSize(9.5);
   const cierre = doc.splitTextToSize(
     "Enviar comprobante a: " + EMPRESA.correoComprobante + "   ·   Teléfonos: " + EMPRESA.telefonos, ANCHO);
-  doc.text(cierre, M, y2);
-  y2 += 5.6 * cierre.length + 4;
-
   const parrafo = doc.splitTextToSize(
     "Sin otro particular e invitándolos a conocer más de nuestros productos para protección pasiva contra incendios, tabiques y aislación térmica-acústica en " + EMPRESA.web + ", les saluda atentamente;", ANCHO);
+  y2 = asegurarEspacio(y2, 5.6*(cierre.length + parrafo.length) + 23);
+  doc.text(cierre, M, y2);
+  y2 += 5.6 * cierre.length + 4;
   doc.text(parrafo, M, y2);
   y2 += 5.6 * parrafo.length + 12;
 
@@ -956,23 +1004,50 @@ function descargarPDF(modo){
   doc.text("WhatsApp: " + EMPRESA.whatsapp, M, y2+7);
   doc.setTextColor(...negro);
 
-  // ---- Pie de página con marca ----
-  const pageH = doc.internal.pageSize.getHeight();
-  if(color){
-    doc.setFillColor(...azulOsc);
-    doc.rect(0, pageH-10, PAG_W, 10, "F");
-    doc.setFontSize(8); doc.setTextColor(255,255,255);
-    doc.text("www.skintec.cl  ·  Protección pasiva contra incendios · Aislación térmica y acústica", PAG_W/2, pageH-4.5, {align:"center"});
-  } else {
-    doc.setFontSize(8); doc.setTextColor(...grisTxt);
-    doc.text("www.skintec.cl  ·  Protección pasiva contra incendios · Aislación térmica y acústica", PAG_W/2, pageH-6, {align:"center"});
+  // ---- Pie de página con marca (en todas las páginas) ----
+  const nPag = doc.internal.getNumberOfPages();
+  for(let i=1; i<=nPag; i++){
+    doc.setPage(i);
+    if(color){
+      doc.setFillColor(...azulOsc);
+      doc.rect(0, PAG_H-10, PAG_W, 10, "F");
+      doc.setFontSize(8); doc.setTextColor(255,255,255);
+      doc.text("www.skintec.cl  ·  Protección pasiva contra incendios · Aislación térmica y acústica", PAG_W/2, PAG_H-4.5, {align:"center"});
+    } else {
+      doc.setFontSize(8); doc.setTextColor(...grisTxt);
+      doc.text("www.skintec.cl  ·  Protección pasiva contra incendios · Aislación térmica y acústica", PAG_W/2, PAG_H-6, {align:"center"});
+    }
+    if(nPag > 1){
+      doc.setFontSize(8); doc.setTextColor(...grisTxt);
+      doc.text("Página " + i + " de " + nPag, PAG_W - M, PAG_H-13, {align:"right"});
+    }
   }
 
+  // Nombre de archivo: "NombreCliente Maña Numero" (la maña solo aparece aquí, nunca dentro del PDF)
   const sanitizarNombre = (s) => String(s||"").replace(/[\\/:*?"<>|]/g,"").replace(/\s+/g," ").trim();
-  const clienteArchivo = sanitizarNombre(d.cliente) || "Cliente";
-  const baseArchivo = clienteArchivo + " " + d.numero;
+  const clienteArchivo = sanitizarNombre(d.cliente==="-" ? "" : d.cliente) || "Cliente";
+  const manaArchivo = sanitizarNombre(d.mana);
+  const baseArchivo = clienteArchivo + (manaArchivo ? " " + manaArchivo : "") + " " + d.numero;
   const nombreArchivo = color ? (baseArchivo + ".pdf") : (baseArchivo + " (imprimir).pdf");
   doc.save(nombreArchivo);
+}
+
+/* Sección "Comentarios u observaciones" en el PDF (cotización y OC). Devuelve la nueva Y. */
+function dibujarObservacionesPDF(doc, texto, y, o){
+  y = o.asegurarEspacio(y, 20);
+  doc.setFont("helvetica","bold"); doc.setFontSize(11.5);
+  doc.setTextColor(...(o.color ? o.azulOsc : o.negro));
+  doc.text("COMENTARIOS U OBSERVACIONES", o.M, y);
+  doc.setDrawColor(...o.rojo); doc.setLineWidth(0.5);
+  doc.line(o.M, y+2, o.M+70, y+2);
+  doc.setTextColor(...o.negro); doc.setFont("helvetica","normal"); doc.setFontSize(9.5);
+  y += 8;
+  doc.splitTextToSize(texto, o.ANCHO).forEach(linea=>{
+    y = o.asegurarEspacio(y, 5);
+    doc.text(linea, o.M, y);
+    y += 5;
+  });
+  return y + 1;
 }
 
 /* ============ PESTAÑAS ============ */
@@ -996,6 +1071,43 @@ const LS_PROVEEDORES = "skintec_oc_proveedores_v1";
 let itemsOC = [];
 let seqItemOC = 1;
 
+/* Proveedores frecuentes: al elegirlos se rellenan razón social, RUT y contacto */
+const PROVEEDORES_FIJOS = [
+  {nombre:"Aislantes Volcán S.A.",                rut:"96.848.750-7", contacto:"Sr. Carlos Figueroa"},
+  {nombre:"Compañía Industrial El Volcán S.A.",   rut:"90.209.000-2", contacto:"Sr. Carlos Figueroa"},
+  {nombre:"Sociedad Industrial Pizarreño S.A.",   rut:"96.573.780-4", contacto:"Srta. Javiera Gajardo Cortés"},
+  {nombre:"Knauf Chile SPA",                      rut:"76.201.342-8", contacto:"Srta. María Verónica Bascuñan"},
+  {nombre:"Nicolaides Industrial S.A.",           rut:"76.163.257-4", contacto:"Srta. María Elisa Zamora"},
+  {nombre:"Val Company SpA",                      rut:"77.099.314-8", contacto:"Sr. Hernán Valdivieso"},
+  {nombre:"C y M San Pascual S.A.",               rut:"96.575.580-7", contacto:"Sr. Julio Arriagada"},
+  {nombre:"Industrial Comercial Chile",           rut:"77.160.818-3", contacto:"Roberto Barahona"},
+  {nombre:"RTK SpA",                              rut:"76.917.881-3", contacto:"Srta. Joanna Stern Estragues"}
+];
+function renderSelectProveedores(){
+  document.getElementById('oc_proveedor_sel').innerHTML =
+    `<option value="">— Elegir proveedor —</option>` +
+    PROVEEDORES_FIJOS.map((p,i)=>`<option value="${i}">${escapeAttr(p.nombre)}</option>`).join("") +
+    `<option value="nuevo">Vacío para proveedores nuevos</option>`;
+}
+function onProveedorSelect(valor){
+  if(valor==="") return;
+  const campos = ['oc_proveedor','oc_rut','oc_contacto','oc_correo','oc_telefono'];
+  if(valor==="nuevo"){
+    campos.forEach(id=>document.getElementById(id).value="");
+    document.getElementById('oc_proveedor').focus();
+    return;
+  }
+  const p = PROVEEDORES_FIJOS[Number(valor)];
+  if(!p) return;
+  // correo/teléfono: se usan los recordados en este navegador si existen
+  const r = cargarProveedores().find(x=>x.nombre.toLowerCase()===p.nombre.toLowerCase()) || {};
+  document.getElementById('oc_proveedor').value = p.nombre;
+  document.getElementById('oc_rut').value = p.rut;
+  document.getElementById('oc_contacto').value = p.contacto;
+  document.getElementById('oc_correo').value = r.correo || "";
+  document.getElementById('oc_telefono').value = r.telefono || "";
+}
+
 /* N° OC: OC-AAMMDD-NN (NN = correlativo del día, independiente de las cotizaciones) */
 function sugerirNumeroOC(){
   const hoy = new Date();
@@ -1011,8 +1123,10 @@ function cargarProveedores(){
   try{ const p = JSON.parse(localStorage.getItem(LS_PROVEEDORES) || "[]"); return Array.isArray(p) ? p : []; }catch(e){ return []; }
 }
 function renderListaProveedores(){
+  const fijos = PROVEEDORES_FIJOS.map(p=>p.nombre.toLowerCase());
   document.getElementById('lista_proveedores').innerHTML =
-    cargarProveedores().map(p=>`<option value="${escapeAttr(p.nombre)}">`).join("");
+    PROVEEDORES_FIJOS.concat(cargarProveedores().filter(p=>!fijos.includes(p.nombre.toLowerCase())))
+      .map(p=>`<option value="${escapeAttr(p.nombre)}">`).join("");
 }
 function recordarProveedor(d){
   if(!d.proveedor || d.proveedor==="-") return;
@@ -1022,7 +1136,10 @@ function recordarProveedor(d){
   renderListaProveedores();
 }
 function onProveedorChange(nombre){
-  const p = cargarProveedores().find(x=>x.nombre.toLowerCase()===String(nombre).trim().toLowerCase());
+  const n = String(nombre).trim().toLowerCase();
+  const iFijo = PROVEEDORES_FIJOS.findIndex(x=>x.nombre.toLowerCase()===n);
+  if(iFijo >= 0){ document.getElementById('oc_proveedor_sel').value = String(iFijo); onProveedorSelect(String(iFijo)); return; }
+  const p = cargarProveedores().find(x=>x.nombre.toLowerCase()===n);
   if(!p) return;
   document.getElementById('oc_rut').value = p.rut || "";
   document.getElementById('oc_contacto').value = p.contacto || "";
@@ -1121,6 +1238,7 @@ function nuevaOC(){
   if(!confirm("¿Limpiar todos los datos y empezar una nueva orden de compra?")) return;
   ["oc_ref","oc_proveedor","oc_rut","oc_contacto","oc_correo","oc_telefono","oc_obra","oc_plazo","oc_lugar","oc_obs"]
     .forEach(id=>document.getElementById(id).value="");
+  document.getElementById('oc_proveedor_sel').value = "";
   document.getElementById('oc_fecha').value = hoyISO();
   document.getElementById('oc_numero').value = sugerirNumeroOC();
   itemsOC = [];
@@ -1230,7 +1348,6 @@ function descargarPDF_OC(modo){
     ["Lugar de entrega", d.lugar || "-"],
     ["Condiciones de pago", d.pago || "-"]
   ];
-  if(d.obs) condiciones.push(["Observaciones", d.obs]);
   y2 = asegurarEspacio(y2, 20);
   doc.setFont("helvetica","bold"); doc.setFontSize(11.5);
   doc.setTextColor(...(color?azulOsc:negro));
@@ -1247,6 +1364,9 @@ function descargarPDF_OC(modo){
     doc.text(texto, M+50, y2);
     y2 += 5.6 * texto.length + 1.2;
   });
+
+  // ---- Comentarios u observaciones ----
+  if(d.obs) y2 = dibujarObservacionesPDF(doc, d.obs, y2 + 3, {M, ANCHO, color, azulOsc, rojo, negro, asegurarEspacio});
 
   // ---- Datos de facturación ----
   y2 = asegurarEspacio(y2 + 3, 15);
@@ -1306,6 +1426,7 @@ function descargarPDF_OC(modo){
 function initOC(){
   document.getElementById('oc_fecha').value = hoyISO();
   document.getElementById('oc_numero').value = sugerirNumeroOC();
+  renderSelectProveedores();
   renderListaProveedores();
   agregarItemOC();
 }
