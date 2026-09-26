@@ -55,7 +55,7 @@
 
   .table-scroll{width:100%; overflow-x:auto;}
   table.items{width:100%; min-width:1120px; border-collapse:collapse; margin-top:6px; font-size:13px;}
-  table.items th{background:var(--azul-oscuro); color:#fff; text-align:left; padding:9px 7px; font-weight:500; font-size:11.5px; text-transform:uppercase; letter-spacing:.03em;}
+  table.items th{background:var(--azul-oscuro); color:#fff; text-align:center; vertical-align:middle; padding:9px 7px; font-weight:500; font-size:11.5px; text-transform:uppercase; letter-spacing:.03em;}
   table.items td{padding:7px 6px; border-bottom:1px solid var(--gris-claro); vertical-align:top;}
   table.items tfoot td{border-top:2px solid var(--azul-oscuro); font-weight:600;}
   .col-del{width:30px; text-align:center;}
@@ -84,7 +84,7 @@
 
   details.admin summary{cursor:pointer; font-weight:600; color:var(--azul-oscuro); padding:6px 0;}
   table.catalogo{width:100%; min-width:840px; border-collapse:collapse; font-size:13px; margin-top:12px;}
-  table.catalogo th{background:var(--gris-claro); text-align:left; padding:7px 6px; font-size:11px; text-transform:uppercase;}
+  table.catalogo th{background:var(--gris-claro); text-align:center; vertical-align:middle; padding:7px 6px; font-size:11px; text-transform:uppercase;}
   table.catalogo td{padding:6px; border-bottom:1px solid #eee;}
   table.catalogo input, table.catalogo select{padding:6px 7px; font-size:12.5px;}
 
@@ -181,12 +181,12 @@
         <tr>
           <th style="width:9%">Archivo</th>
           <th style="width:13%">Categoría</th>
-          <th style="width:20%">Producto / Descripción</th>
-          <th style="width:6%">Unidad</th>
+          <th style="width:19%">Producto / Descripción</th>
+          <th style="width:7%">Unidad</th>
+          <th style="width:7%">Cantidad</th>
           <th style="width:9%">Precio Base</th>
           <th style="width:7%">% Rec.</th>
           <th style="width:9%">Precio Final</th>
-          <th style="width:7%">Cantidad</th>
           <th style="width:9%">Total ($)</th>
           <th class="col-del"></th>
         </tr>
@@ -232,7 +232,7 @@
 
   <!-- OBSERVACIONES -->
   <div class="card">
-    <h2>4 · Comentarios u observaciones <span class="h2-extra">Opcional · se incluye en el PDF</span></h2>
+    <h2>4 · Comentarios <span class="h2-extra">Opcional · se incluye en el PDF</span></h2>
     <textarea id="f_obs" rows="4" placeholder="Ej: Precios sujetos a variación según disponibilidad de stock."></textarea>
   </div>
 
@@ -323,7 +323,7 @@
 
   <!-- OBSERVACIONES -->
   <div class="card">
-    <h2>4 · Comentarios u observaciones <span class="h2-extra">Opcional · se incluye en el PDF</span></h2>
+    <h2>4 · Comentarios <span class="h2-extra">Opcional · se incluye en el PDF</span></h2>
     <textarea id="oc_obs" rows="4" placeholder="Ej: Indicar N° de OC en la factura y guía de despacho."></textarea>
   </div>
 
@@ -489,7 +489,7 @@ const CATALOGO_DEFAULT = [
   {archivo:"Volcanita", categoria:"Placas Acústicas CLEANEO", nombre:"Placa CLEANEO 8/15/20 R Circular Aleatoria Plus 12,5", formato:"1200 x 2000 mm UFF V/B (64)", unidad:"m2", precioBase:22847},
 
   // ---- Común a varias hojas ----
-  {archivo:"Otros", categoria:"Servicios y Otros", nombre:"Flete a obra", formato:"Opcional, según ubicación", unidad:"gl", precioBase:95000}
+  {archivo:"Flete", categoria:"Flete", nombre:"Flete a obra", formato:"Opcional, según ubicación", unidad:"gl", precioBase:95000}
 ].map((p,i)=>({id:"cat_"+i, ...p}));
 
 const LS_CATALOGO = "skintec_cotizador_catalogo_v2";
@@ -504,9 +504,16 @@ let margenGlobalDefault = Number(localStorage.getItem(LS_MARGEN_DEFAULT) || "10"
 function cargarCatalogo(){
   try{
     const raw = localStorage.getItem(LS_CATALOGO);
-    if(raw){ const parsed = JSON.parse(raw); if(Array.isArray(parsed) && parsed.length) return parsed; }
+    if(raw){ const parsed = JSON.parse(raw); if(Array.isArray(parsed) && parsed.length) return migrarCatalogo(parsed); }
   }catch(e){}
   return JSON.parse(JSON.stringify(CATALOGO_DEFAULT));
+}
+/* El flete es su propio tipo de producto (antes estaba dentro de "Otros") */
+function migrarCatalogo(cat){
+  cat.forEach(p=>{
+    if(p.archivo==="Otros" && /flete/i.test(p.nombre||"")){ p.archivo = "Flete"; p.categoria = "Flete"; }
+  });
+  return cat;
 }
 function guardarCatalogo(){
   localStorage.setItem(LS_CATALOGO, JSON.stringify(catalogo));
@@ -657,10 +664,10 @@ function renderItems(){
             ${["un","m2","rollo","gl","kg","m","unidad"].map(u=>`<option value="${u}" ${it.unidad===u?'selected':''}>${u}</option>`).join("")}
           </select>
         </td>
+        <td><input type="number" min="0" step="1" value="${it.cantidad}" onchange="onCampoItem(${it.uid},'cantidad',this.value)"></td>
         <td><input type="number" min="0" step="1" value="${it.precioBase}" onchange="onCampoItem(${it.uid},'precioBase',this.value)"></td>
         <td><input type="number" min="0" step="0.5" value="${it.margen}" onchange="onCampoItem(${it.uid},'margen',this.value)"></td>
         <td class="celda-final">${formatoCLP(pf)}</td>
-        <td><input type="number" min="0" step="1" value="${it.cantidad}" onchange="onCampoItem(${it.uid},'cantidad',this.value)"></td>
         <td class="celda-total">${formatoCLP(it.cantidad*pf)}</td>
         <td class="col-del"><button class="btn-del" onclick="quitarItem(${it.uid})" title="Quitar">✕</button></td>`;
     } else {
@@ -689,10 +696,10 @@ function renderItems(){
             ${["un","m2","rollo","gl","kg","m","unidad"].map(u=>`<option value="${u}" ${it.unidad===u?'selected':''}>${u}</option>`).join("")}
           </select>
         </td>
+        <td><input type="number" min="0" step="1" value="${it.cantidad}" onchange="onCampoItem(${it.uid},'cantidad',this.value)"></td>
         <td class="celda-base">${formatoCLP(it.precioBase)}</td>
         <td><input type="number" min="0" step="0.5" value="${it.margen}" onchange="onCampoItem(${it.uid},'margen',this.value)"></td>
         <td class="celda-final">${formatoCLP(pf)}</td>
-        <td><input type="number" min="0" step="1" value="${it.cantidad}" onchange="onCampoItem(${it.uid},'cantidad',this.value)"></td>
         <td class="celda-total">${formatoCLP(it.cantidad*pf)}</td>
         <td class="col-del"><button class="btn-del" onclick="quitarItem(${it.uid})" title="Quitar">✕</button></td>`;
     }
@@ -785,7 +792,7 @@ function importarCatalogo(ev){
     try{
       const parsed = JSON.parse(e.target.result);
       if(!Array.isArray(parsed)) throw new Error("formato inválido");
-      catalogo = parsed;
+      catalogo = migrarCatalogo(parsed);
       guardarCatalogo();
       renderCatalogoAdmin();
       renderItems();
@@ -854,55 +861,197 @@ function validarAntesDeDescargar(d){
   return true;
 }
 
+/* ---- Utilidades comunes de PDF (cotización y OC) ---- */
+const MAX_ITEMS_UNA_PAGINA = 5;
+const PIE_PDF = "www.skintec.cl  ·  Protección pasiva contra incendios · Aislación térmica y acústica";
+
+/* Con hasta 5 productos el PDF siempre sale en 1 página: se prueba con el diseño normal
+   y, si no cabe, se va compactando (letra y espacios) hasta que quepa. */
+function generarPDFUnaPagina(nItems, construir){
+  const niveles = nItems > MAX_ITEMS_UNA_PAGINA ? [1] : [1, .9, .8, .7, .6, .5, .4];
+  let doc;
+  for(const S of niveles){
+    doc = construir(S);
+    if(doc.internal.getNumberOfPages() === 1) break;
+  }
+  return doc;
+}
+function estiloPDF(modo){
+  const color = (modo==='color');
+  return {
+    color,
+    azul: [14,101,175],
+    azulOsc: [10,74,128],
+    rojo: [228,35,19],
+    negro: [20,20,20],
+    grisTxt: [110,110,110],
+    azulFondo: [235,242,248],
+    // En la versión para imprimir no hay rellenos ni líneas gruesas: solo trazos finos grises
+    lineaTitulo: color ? [228,35,19] : [150,150,150]
+  };
+}
+/* Título de sección con subrayado. Devuelve la Y donde empieza el contenido. */
+function tituloSeccionPDF(doc, texto, y, o, S){
+  doc.setFont("helvetica","bold"); doc.setFontSize(9 + 1*S);
+  doc.setTextColor(...(o.color ? o.azulOsc : o.negro));
+  doc.text(texto, o.M, y);
+  doc.setDrawColor(...o.lineaTitulo); doc.setLineWidth(o.color ? 0.5 : 0.2);
+  doc.line(o.M, y+1.6, o.M+60, y+1.6);
+  doc.setTextColor(...o.negro); doc.setFont("helvetica","normal");
+  return y + 4.5 + 1.5*S;
+}
+/* Lista "Etiqueta : valor" con letra pequeña. Devuelve la nueva Y. */
+function listaCondicionesPDF(doc, filas, y, o, S){
+  const fs = 7.5 + 0.5*S, lh = 3.2 + 0.4*S, colValor = 41;
+  doc.setFontSize(fs);
+  filas.forEach(([label, valor])=>{
+    const texto = doc.splitTextToSize(valor, o.ANCHO - colValor);
+    y = o.asegurarEspacio(y, lh*texto.length);
+    doc.setFont("helvetica","bold"); doc.text(label, o.M, y);
+    doc.setFont("helvetica","normal"); doc.text(":", o.M+colValor-3, y);
+    doc.text(texto, o.M+colValor, y);
+    y += lh * texto.length + 0.6*S;
+  });
+  return y;
+}
+/* Tabla de productos: encabezados centrados, cantidad junto a la unidad y precios a la derecha */
+function tablaItemsPDF(doc, filas, startY, cabeceraPrecio, o, S){
+  doc.autoTable({
+    startY,
+    head: [["Ítem","Producto","Unidad","Cant.",cabeceraPrecio,"Total ($)"]],
+    body: filas,
+    styles:{ font:"helvetica", fontSize: 7.5 + 2*S, textColor: o.negro, lineColor: o.color?[210,218,226]:[190,190,190], lineWidth:0.15, cellPadding: 1 + 1.6*S, valign:"middle" },
+    headStyles: o.color ? { fillColor: o.azulOsc, textColor:[255,255,255], fontStyle:"bold", fontSize: 7.5 + 1.5*S, halign:"center" }
+                        : { fillColor:false, textColor: o.negro, fontStyle:"bold", lineWidth:0.2, lineColor:[150,150,150], fontSize: 7.5 + 1.5*S, halign:"center" },
+    alternateRowStyles: o.color ? { fillColor:[246,249,252] } : { fillColor:false },
+    bodyStyles: o.color ? {} : { fillColor:false },
+    columnStyles:{ 0:{cellWidth:13, halign:"center"}, 1:{cellWidth:"auto"}, 2:{cellWidth:16, halign:"center"}, 3:{cellWidth:16, halign:"center"}, 4:{cellWidth:28, halign:"right"}, 5:{cellWidth:28, halign:"right"} },
+    margin:{left:o.M, right:o.M, bottom:18}
+  });
+  return doc.lastAutoTable.finalY;
+}
+/* Caja de totales (a la derecha). Devuelve la Y bajo la caja. */
+function totalesPDF(doc, y, {neto, iva, total}, o, S){
+  const t = 0.7 + 0.3*S;
+  const anchoBox = 78, padBox = 5;
+  const boxRight = o.PAG_W - o.M, boxLeft = boxRight - anchoBox;
+  y += 7.5*t;
+  if(o.color){ doc.setFillColor(...o.azulFondo); doc.rect(boxLeft, y-5.5*t, anchoBox, 24*t, "F"); }
+  doc.setFont("helvetica","normal"); doc.setFontSize(8.5 + 1.5*S); doc.setTextColor(...o.negro);
+  doc.text("Total Neto $", boxLeft+padBox, y); doc.text(formatoCLP(neto), boxRight-padBox, y, {align:"right"});
+  doc.text("19% IVA", boxLeft+padBox, y+5.5*t); doc.text(formatoCLP(iva), boxRight-padBox, y+5.5*t, {align:"right"});
+  doc.setDrawColor(...(o.color?o.azul:o.grisTxt)); doc.setLineWidth(o.color?0.4:0.2);
+  doc.line(boxLeft+padBox-2, y+8.5*t, boxRight-padBox, y+8.5*t);
+  doc.setFont("helvetica","bold"); doc.setFontSize(10.5 + 2.5*S);
+  doc.setTextColor(...(o.color?o.azulOsc:o.negro));
+  doc.text("TOTAL $", boxLeft+padBox, y+15*t); doc.text(formatoCLP(total), boxRight-padBox, y+15*t, {align:"right"});
+  doc.setFont("helvetica","normal"); doc.setTextColor(...o.negro);
+  return y + 18.5*t + 2*S;
+}
+/* Pie de página: franja de color solo en la versión cliente; en la de imprimir, texto gris sin relleno */
+function pieDePaginaPDF(doc, o){
+  const nPag = doc.internal.getNumberOfPages();
+  for(let i=1; i<=nPag; i++){
+    doc.setPage(i);
+    if(o.color){
+      doc.setFillColor(...o.azulOsc);
+      doc.rect(0, o.PAG_H-10, o.PAG_W, 10, "F");
+      doc.setFontSize(8); doc.setTextColor(255,255,255);
+      doc.text(PIE_PDF, o.PAG_W/2, o.PAG_H-4.5, {align:"center"});
+    } else {
+      doc.setFontSize(8); doc.setTextColor(...o.grisTxt);
+      doc.text(PIE_PDF, o.PAG_W/2, o.PAG_H-6, {align:"center"});
+    }
+    if(nPag > 1){
+      doc.setFontSize(8); doc.setTextColor(...o.grisTxt);
+      doc.text("Página " + i + " de " + nPag, o.PAG_W - o.M, o.PAG_H-13, {align:"right"});
+    }
+  }
+}
+/* Documento base con encabezado (logo, N°, fecha y título). Devuelve {doc, o, y}. */
+function iniciarPDF(modo, titulo, numero, fecha, S){
+  const { jsPDF } = window.jspdf;
+  const doc = new jsPDF({unit:"mm", format:"letter"});
+  const o = estiloPDF(modo);
+  o.PAG_W = doc.internal.pageSize.getWidth();
+  o.PAG_H = doc.internal.pageSize.getHeight();
+  o.M = 15;
+  o.ANCHO = o.PAG_W - o.M*2;
+  const LIMITE = o.PAG_H - 18; // deja espacio para el pie de página
+  o.asegurarEspacio = (y, alto) => { if(y + alto > LIMITE){ doc.addPage(); return 22; } return y; };
+
+  const yLogo = 10 + 6*S;
+  try{ doc.addImage(document.getElementById('logo_fuente').src, 'PNG', o.M, yLogo, 42, 9.9); }catch(e){}
+  doc.setFont("helvetica","normal"); doc.setFontSize(9); doc.setTextColor(...o.grisTxt);
+  doc.text("N° " + numero, o.PAG_W - o.M, yLogo+3, {align:"right"});
+  doc.text("Fecha: " + fecha, o.PAG_W - o.M, yLogo+8, {align:"right"});
+
+  const y = yLogo + 14 + 10*S;
+  doc.setFont("helvetica","bold"); doc.setFontSize(12 + 3*S);
+  doc.setTextColor(...(o.color?o.azulOsc:o.negro));
+  doc.text(titulo, o.M, y);
+  doc.setDrawColor(...o.lineaTitulo); doc.setLineWidth(o.color?0.8:0.3);
+  doc.line(o.M, y+2.5, o.PAG_W-o.M, y+2.5);
+  return {doc, o, y: y + 6 + 4*S};
+}
+/* Caja de datos (cliente / proveedor): filas de [[etiqueta, valor], [etiqueta, valor]]. Devuelve la Y bajo la caja. */
+function cajaDatosPDF(doc, filasCaja, y, o, S){
+  const lh = 4.4 + 1.8*S;
+  const boxH = lh*filasCaja.length + 1.5 + 2.5*S;
+  if(o.color){ doc.setFillColor(...o.azulFondo); doc.rect(o.M, y, o.ANCHO, boxH, "F"); }
+  doc.setDrawColor(...(o.color?o.azul:o.grisTxt)); doc.setLineWidth(o.color?0.35:0.2);
+  doc.rect(o.M, y, o.ANCHO, boxH);
+  doc.setFontSize(8.5 + 1.5*S); doc.setTextColor(...o.negro);
+  const colB = o.M + (o.ANCHO*0.62);
+  filasCaja.forEach(([izq, der], i)=>{
+    const yy = y + lh*(i+1);
+    doc.setFont("helvetica","bold"); doc.text(izq[0], o.M+3, yy);
+    doc.setFont("helvetica","normal"); doc.text(doc.splitTextToSize(": " + izq[1], colB - (o.M+24) - 3)[0], o.M+24, yy);
+    if(!der) return;
+    doc.setFont("helvetica","bold"); doc.text(der[0], colB, yy);
+    doc.setFont("helvetica","normal"); doc.text(doc.splitTextToSize(": " + der[1], o.PAG_W - o.M - (colB+17) - 2)[0], colB+17, yy);
+  });
+  return y + boxH;
+}
+/* Recuadro de dos columnas (datos bancarios / facturación). Devuelve la Y bajo el recuadro. */
+function recuadroDatosPDF(doc, y, izq, der, o, S){
+  const h = 10 + 5*S;
+  y = o.asegurarEspacio(y, h);
+  if(o.color){ doc.setFillColor(248,249,250); doc.rect(o.M, y, o.ANCHO, h, "F"); }
+  doc.setDrawColor(...(o.color?o.azul:o.grisTxt)); doc.setLineWidth(o.color?0.25:0.2);
+  doc.rect(o.M, y, o.ANCHO, h);
+  doc.setFontSize(7.5 + 1.5*S); doc.setTextColor(...o.negro);
+  const y1 = y + h/2 - 1.2, y2 = y + h/2 + 3.3;
+  doc.setFont("helvetica","bold"); doc.text(izq[0], o.M+3, y1);
+  doc.setFont("helvetica","normal"); doc.text(izq[1], o.M+3, y2);
+  doc.setFont("helvetica","bold"); doc.text(der[0], o.M+o.ANCHO*0.55, y1);
+  doc.setFont("helvetica","normal"); doc.text(der[1], o.M+o.ANCHO*0.55, y2);
+  return y + h;
+}
+const sanitizarNombreArchivo = (s) => String(s||"").replace(/[\\/:*?"<>|]/g,"").replace(/\s+/g," ").trim();
+
 function descargarPDF(modo){
   const d = datosFormulario();
   if(!validarAntesDeDescargar(d)) return;
-  const {neto, iva, total} = calcularTotales();
-  const { jsPDF } = window.jspdf;
-  const doc = new jsPDF({unit:"mm", format:"letter"});
-  const color = (modo==='color');
-  const azul = [14,101,175];
-  const azulOsc = [10,74,128];
-  const rojo = [228,35,19];
-  const negro = [20,20,20];
-  const grisTxt = [110,110,110];
-  const azulFondo = [235,242,248];
+  const doc = generarPDFUnaPagina(items.length, S => construirPDFCotizacion(d, modo, S));
 
-  const PAG_W = doc.internal.pageSize.getWidth();
-  const PAG_H = doc.internal.pageSize.getHeight();
-  const M = 15; // margen izquierdo/derecho
-  const ANCHO = PAG_W - M*2;
-  const LIMITE = PAG_H - 18; // deja espacio para el pie de página
-  const asegurarEspacio = (y, alto) => { if(y + alto > LIMITE){ doc.addPage(); return 22; } return y; };
+  // Nombre de archivo: "NombreCliente Maña Numero" (la maña solo aparece aquí, nunca dentro del PDF)
+  const clienteArchivo = sanitizarNombreArchivo(d.cliente==="-" ? "" : d.cliente) || "Cliente";
+  const manaArchivo = sanitizarNombreArchivo(d.mana);
+  const baseArchivo = clienteArchivo + (manaArchivo ? " " + manaArchivo : "") + " " + d.numero;
+  doc.save(modo==='color' ? (baseArchivo + ".pdf") : (baseArchivo + " (imprimir).pdf"));
+}
 
-  // ---- Encabezado ----
-  try{ doc.addImage(document.getElementById('logo_fuente').src, 'PNG', M, 18, 42, 9.9); }catch(e){}
-
-  doc.setFont("helvetica","normal"); doc.setFontSize(9); doc.setTextColor(...grisTxt);
-  doc.text("N° " + d.numero, PAG_W - M, 21, {align:"right"});
-  doc.text("Fecha: " + d.fecha, PAG_W - M, 26, {align:"right"});
-
-  let y = 48;
-  doc.setFont("helvetica","bold"); doc.setFontSize(15);
-  doc.setTextColor(...(color?azulOsc:negro));
-  doc.text("COTIZACIÓN", M, y);
-  doc.setDrawColor(...rojo); doc.setLineWidth(0.8);
-  doc.line(M, y+3, PAG_W-M, y+3);
+/* Dibuja la cotización completa. S (1 = normal, menor = más compacto) escala letra y espacios. */
+function construirPDFCotizacion(d, modo, S){
+  const {doc, o, y} = iniciarPDF(modo, "COTIZACIÓN", d.numero, d.fecha, S);
 
   // ---- Caja datos cliente ----
-  y += 14;
-  const boxH = 26;
-  if(color){ doc.setFillColor(...azulFondo); doc.rect(M, y, ANCHO, boxH, "F"); }
-  doc.setDrawColor(...(color?azul:negro)); doc.setLineWidth(color?0.35:0.25);
-  doc.rect(M, y, ANCHO, boxH);
-  doc.setFontSize(10); doc.setTextColor(...negro);
-  const lh = 6.2;
-  const colB = M + (ANCHO*0.62);
-  doc.setFont("helvetica","bold"); doc.text("Cliente", M+3, y+lh); doc.setFont("helvetica","normal"); doc.text(": " + d.cliente, M+24, y+lh);
-  doc.setFont("helvetica","bold"); doc.text("RUT", colB, y+lh); doc.setFont("helvetica","normal"); doc.text(": " + (d.rut||"-"), colB+16, y+lh);
-  doc.setFont("helvetica","bold"); doc.text("Atención", M+3, y+lh*2); doc.setFont("helvetica","normal"); doc.text(": " + (d.atencion||"-"), M+24, y+lh*2);
-  doc.setFont("helvetica","bold"); doc.text("Fecha", colB, y+lh*2); doc.setFont("helvetica","normal"); doc.text(": " + d.fecha, colB+16, y+lh*2);
-  doc.setFont("helvetica","bold"); doc.text("Correo", M+3, y+lh*3); doc.setFont("helvetica","normal"); doc.text(": " + (d.correo||"-"), M+24, y+lh*3);
+  let y2 = cajaDatosPDF(doc, [
+    [["Cliente", d.cliente], ["RUT", d.rut||"-"]],
+    [["Atención", d.atencion||"-"], ["Fecha", d.fecha]],
+    [["Correo", d.correo||"-"], null]
+  ], y, o, S);
 
   // ---- Tabla de items (solo precio final, nunca precio base ni %) ----
   const filas = items.map((it,idx)=>[
@@ -913,141 +1062,65 @@ function descargarPDF(modo){
     formatoCLP(precioFinalDeItem(it)),
     formatoCLP(it.cantidad*precioFinalDeItem(it))
   ]);
-
-  doc.autoTable({
-    startY: y+boxH+6,
-    head: [["Ítem","Producto","Unidad","Cant.","Precio ($)","Total ($)"]],
-    body: filas,
-    styles:{ font:"helvetica", fontSize:9.5, textColor: negro, lineColor: color?[210,218,226]:[190,190,190], lineWidth:0.15, cellPadding:2.6 },
-    headStyles: color ? { fillColor: azulOsc, textColor:[255,255,255], fontStyle:"bold", fontSize:9 }
-                       : { fillColor:[255,255,255], textColor: negro, fontStyle:"bold", lineWidth:0.3, lineColor:[0,0,0], fontSize:9 },
-    alternateRowStyles: color ? { fillColor:[246,249,252] } : { fillColor:[255,255,255] },
-    columnStyles:{ 0:{cellWidth:13, halign:"center"}, 1:{cellWidth:86}, 2:{cellWidth:16, halign:"center"}, 3:{cellWidth:16, halign:"center"}, 4:{cellWidth:27, halign:"right"}, 5:{cellWidth:27, halign:"right"} },
-    margin:{left:M, right:M, bottom:18}
-  });
-
-  let y2 = asegurarEspacio(doc.lastAutoTable.finalY + 6, 26);
-  if(y2 === 22) y2 += 6;
+  y2 = tablaItemsPDF(doc, filas, y2 + 3 + 3*S, "Precio ($)", o, S);
 
   // ---- Totales ----
-  const anchoBox = 78;
-  const padBox = 5;
-  const boxRight = PAG_W - M;
-  const boxLeft = boxRight - anchoBox;
-  if(color){ doc.setFillColor(...azulFondo); doc.rect(boxLeft, y2-6, anchoBox, 25, "F"); }
-  doc.setFont("helvetica","normal"); doc.setFontSize(10); doc.setTextColor(...negro);
-  doc.text("Total Neto $", boxLeft+padBox, y2); doc.text(formatoCLP(neto), boxRight-padBox, y2, {align:"right"});
-  doc.text("19% IVA", boxLeft+padBox, y2+6); doc.text(formatoCLP(iva), boxRight-padBox, y2+6, {align:"right"});
-  doc.setDrawColor(...(color?azul:negro)); doc.setLineWidth(0.4);
-  doc.line(boxLeft+padBox-2, y2+9, boxRight-padBox, y2+9);
-  doc.setFont("helvetica","bold"); doc.setFontSize(13);
-  if(color) doc.setTextColor(...azulOsc); else doc.setTextColor(...negro);
-  doc.text("TOTAL $", boxLeft+padBox, y2+16); doc.text(formatoCLP(total), boxRight-padBox, y2+16, {align:"right"});
-  doc.setFont("helvetica","normal"); doc.setTextColor(...negro); doc.setFontSize(10);
-
-  y2 += 26;
+  y2 = o.asegurarEspacio(y2, 22);
+  y2 = totalesPDF(doc, y2, calcularTotales(), o, S);
 
   // ---- Condiciones comerciales ----
-  y2 = asegurarEspacio(y2, 20);
-  doc.setFont("helvetica","bold"); doc.setFontSize(11.5);
-  doc.setTextColor(...(color?azulOsc:negro));
-  doc.text("CONDICIONES COMERCIALES", M, y2);
-  doc.setDrawColor(...rojo); doc.setLineWidth(0.5);
-  doc.line(M, y2+2, M+70, y2+2);
-  doc.setTextColor(...negro); doc.setFont("helvetica","normal"); doc.setFontSize(9.5);
-  y2 += 8;
-  const condiciones = [
+  y2 = tituloSeccionPDF(doc, "CONDICIONES COMERCIALES", o.asegurarEspacio(y2, 16), o, S);
+  y2 = listaCondicionesPDF(doc, [
     ["Plazo de entrega", d.plazo || "-"],
     ["Lugar de entrega", d.lugar || "-"],
     ["Condiciones de pago", d.pago || "-"],
     ["Validez de la cotización", d.validez || "-"]
-  ];
-  condiciones.forEach(([label, valor])=>{
-    const texto = doc.splitTextToSize(valor, 138);
-    y2 = asegurarEspacio(y2, 5.6*texto.length);
-    doc.setFont("helvetica","bold"); doc.text(label, M, y2);
-    doc.setFont("helvetica","normal"); doc.text(":", M+46, y2);
-    doc.text(texto, M+50, y2);
-    y2 += 5.6 * texto.length + 1.2;
-  });
+  ], y2, o, S);
 
-  // ---- Comentarios u observaciones ----
-  if(d.obs) y2 = dibujarObservacionesPDF(doc, d.obs, y2 + 3, {M, ANCHO, color, azulOsc, rojo, negro, asegurarEspacio});
+  // ---- Comentarios ----
+  if(d.obs) y2 = dibujarObservacionesPDF(doc, d.obs, y2 + 1 + 2*S, o, S);
 
   // ---- Datos bancarios ----
-  y2 = asegurarEspacio(y2 + 3, 15);
-  if(color){ doc.setFillColor(248,249,250); doc.rect(M, y2, ANCHO, 15, "F"); }
-  doc.setDrawColor(...(color?azul:negro)); doc.setLineWidth(0.25);
-  doc.rect(M, y2, ANCHO, 15);
-  doc.setFontSize(9);
-  doc.setFont("helvetica","bold"); doc.text("Orden de compra y transferencias a nombre de:", M+3, y2+6);
-  doc.setFont("helvetica","normal"); doc.text(EMPRESA.rutEmpresa, M+3, y2+11.5);
-  doc.setFont("helvetica","bold"); doc.text(EMPRESA.banco, M+ANCHO*0.55, y2+6);
-  doc.setFont("helvetica","normal"); doc.text(EMPRESA.cuenta, M+ANCHO*0.55, y2+11.5);
+  y2 = recuadroDatosPDF(doc, y2 + 1 + 2*S,
+    ["Orden de compra y transferencias a nombre de:", EMPRESA.rutEmpresa],
+    [EMPRESA.banco, EMPRESA.cuenta], o, S);
 
-  y2 += 23;
-  doc.setFontSize(9.5);
+  // ---- Cierre y firma ----
+  const lh = 3.8 + 1*S;
+  y2 += 4 + 4*S;
+  doc.setFont("helvetica","normal"); doc.setFontSize(8 + 1.5*S); doc.setTextColor(...o.negro);
   const cierre = doc.splitTextToSize(
-    "Enviar comprobante a: " + EMPRESA.correoComprobante + "   ·   Teléfonos: " + EMPRESA.telefonos, ANCHO);
+    "Enviar comprobante a: " + EMPRESA.correoComprobante + "   ·   Teléfonos: " + EMPRESA.telefonos, o.ANCHO);
   const parrafo = doc.splitTextToSize(
-    "Sin otro particular e invitándolos a conocer más de nuestros productos para protección pasiva contra incendios, tabiques y aislación térmica-acústica en " + EMPRESA.web + ", les saluda atentamente;", ANCHO);
-  y2 = asegurarEspacio(y2, 5.6*(cierre.length + parrafo.length) + 23);
-  doc.text(cierre, M, y2);
-  y2 += 5.6 * cierre.length + 4;
-  doc.text(parrafo, M, y2);
-  y2 += 5.6 * parrafo.length + 12;
+    "Sin otro particular y quedando atentos a cualquier consulta, les saluda atentamente,", o.ANCHO);
+  y2 = o.asegurarEspacio(y2, lh*(cierre.length + parrafo.length) + 14 + 6*S);
+  doc.text(cierre, o.M, y2);
+  y2 += lh * cierre.length + 1 + 2*S;
+  doc.text(parrafo, o.M, y2);
+  y2 += lh * parrafo.length + 4 + 6*S;
 
-  doc.setFont("helvetica","bold"); doc.setFontSize(10.5);
-  doc.text(d.vendedor, M, y2);
-  doc.setFont("helvetica","normal"); doc.setFontSize(10);
-  if(color) doc.setTextColor(...azul);
-  doc.text("WhatsApp: " + EMPRESA.whatsapp, M, y2+7);
-  doc.setTextColor(...negro);
+  doc.setFont("helvetica","bold"); doc.setFontSize(9 + 1.5*S);
+  doc.text(d.vendedor, o.M, y2);
+  doc.setFont("helvetica","normal"); doc.setFontSize(8.5 + 1.5*S);
+  if(o.color) doc.setTextColor(...o.azul);
+  doc.text("WhatsApp: " + EMPRESA.whatsapp, o.M, y2 + 4 + 2*S);
+  doc.setTextColor(...o.negro);
 
-  // ---- Pie de página con marca (en todas las páginas) ----
-  const nPag = doc.internal.getNumberOfPages();
-  for(let i=1; i<=nPag; i++){
-    doc.setPage(i);
-    if(color){
-      doc.setFillColor(...azulOsc);
-      doc.rect(0, PAG_H-10, PAG_W, 10, "F");
-      doc.setFontSize(8); doc.setTextColor(255,255,255);
-      doc.text("www.skintec.cl  ·  Protección pasiva contra incendios · Aislación térmica y acústica", PAG_W/2, PAG_H-4.5, {align:"center"});
-    } else {
-      doc.setFontSize(8); doc.setTextColor(...grisTxt);
-      doc.text("www.skintec.cl  ·  Protección pasiva contra incendios · Aislación térmica y acústica", PAG_W/2, PAG_H-6, {align:"center"});
-    }
-    if(nPag > 1){
-      doc.setFontSize(8); doc.setTextColor(...grisTxt);
-      doc.text("Página " + i + " de " + nPag, PAG_W - M, PAG_H-13, {align:"right"});
-    }
-  }
-
-  // Nombre de archivo: "NombreCliente Maña Numero" (la maña solo aparece aquí, nunca dentro del PDF)
-  const sanitizarNombre = (s) => String(s||"").replace(/[\\/:*?"<>|]/g,"").replace(/\s+/g," ").trim();
-  const clienteArchivo = sanitizarNombre(d.cliente==="-" ? "" : d.cliente) || "Cliente";
-  const manaArchivo = sanitizarNombre(d.mana);
-  const baseArchivo = clienteArchivo + (manaArchivo ? " " + manaArchivo : "") + " " + d.numero;
-  const nombreArchivo = color ? (baseArchivo + ".pdf") : (baseArchivo + " (imprimir).pdf");
-  doc.save(nombreArchivo);
+  pieDePaginaPDF(doc, o);
+  return doc;
 }
 
-/* Sección "Comentarios u observaciones" en el PDF (cotización y OC). Devuelve la nueva Y. */
-function dibujarObservacionesPDF(doc, texto, y, o){
-  y = o.asegurarEspacio(y, 20);
-  doc.setFont("helvetica","bold"); doc.setFontSize(11.5);
-  doc.setTextColor(...(o.color ? o.azulOsc : o.negro));
-  doc.text("COMENTARIOS U OBSERVACIONES", o.M, y);
-  doc.setDrawColor(...o.rojo); doc.setLineWidth(0.5);
-  doc.line(o.M, y+2, o.M+70, y+2);
-  doc.setTextColor(...o.negro); doc.setFont("helvetica","normal"); doc.setFontSize(9.5);
-  y += 8;
+/* Sección "Comentarios" en el PDF (cotización y OC), con letra pequeña. Devuelve la nueva Y. */
+function dibujarObservacionesPDF(doc, texto, y, o, S){
+  y = tituloSeccionPDF(doc, "COMENTARIOS", o.asegurarEspacio(y, 12), o, S);
+  const lh = 3.2 + 0.4*S;
+  doc.setFontSize(7.5 + 0.5*S);
   doc.splitTextToSize(texto, o.ANCHO).forEach(linea=>{
-    y = o.asegurarEspacio(y, 5);
+    y = o.asegurarEspacio(y, lh);
     doc.text(linea, o.M, y);
-    y += 5;
+    y += lh;
   });
-  return y + 1;
+  return y + 0.6*S;
 }
 
 /* ============ PESTAÑAS ============ */
@@ -1249,59 +1322,25 @@ function descargarPDF_OC(modo){
   const d = datosFormularioOC();
   if(!itemsOC.length){ alert("Agrega al menos un producto antes de descargar la orden de compra."); return; }
   if(d.proveedor==="-"){ if(!confirm("No ingresaste el nombre del proveedor. ¿Descargar de todos modos?")) return; }
-  const {neto, iva, total} = calcularTotalesOC();
-  const { jsPDF } = window.jspdf;
-  const doc = new jsPDF({unit:"mm", format:"letter"});
-  const color = (modo==='color');
-  const azul = [14,101,175];
-  const azulOsc = [10,74,128];
-  const rojo = [228,35,19];
-  const negro = [20,20,20];
-  const grisTxt = [110,110,110];
-  const azulFondo = [235,242,248];
+  const doc = generarPDFUnaPagina(itemsOC.length, S => construirPDF_OC(d, modo, S));
 
-  const PAG_W = doc.internal.pageSize.getWidth();
-  const PAG_H = doc.internal.pageSize.getHeight();
-  const M = 15;
-  const ANCHO = PAG_W - M*2;
-  const LIMITE = PAG_H - 18; // deja espacio para el pie de página
-  const asegurarEspacio = (y, alto) => { if(y + alto > LIMITE){ doc.addPage(); return 22; } return y; };
+  recordarProveedor(d);
+  const baseArchivo = d.numero + " " + (sanitizarNombreArchivo(d.proveedor==="-" ? "" : d.proveedor) || "Proveedor");
+  doc.save(modo==='color' ? (baseArchivo + ".pdf") : (baseArchivo + " (imprimir).pdf"));
+}
 
-  // ---- Encabezado ----
-  try{ doc.addImage(document.getElementById('logo_fuente').src, 'PNG', M, 18, 42, 9.9); }catch(e){}
-  doc.setFont("helvetica","normal"); doc.setFontSize(9); doc.setTextColor(...grisTxt);
-  doc.text("N° " + d.numero, PAG_W - M, 21, {align:"right"});
-  doc.text("Fecha: " + d.fecha, PAG_W - M, 26, {align:"right"});
-
-  let y = 48;
-  doc.setFont("helvetica","bold"); doc.setFontSize(15);
-  doc.setTextColor(...(color?azulOsc:negro));
-  doc.text("ORDEN DE COMPRA", M, y);
-  doc.setDrawColor(...rojo); doc.setLineWidth(0.8);
-  doc.line(M, y+3, PAG_W-M, y+3);
+/* Dibuja la orden de compra completa. S (1 = normal, menor = más compacto) escala letra y espacios. */
+function construirPDF_OC(d, modo, S){
+  const {doc, o, y} = iniciarPDF(modo, "ORDEN DE COMPRA", d.numero, d.fecha, S);
 
   // ---- Caja datos proveedor ----
-  y += 14;
-  const lh = 6.2;
   const filasCaja = [
     [["Proveedor", d.proveedor], ["RUT", d.rut||"-"]],
     [["Contacto", d.contacto||"-"], ["Fecha", d.fecha]],
     [["Correo", d.correo||"-"], ["Teléfono", d.telefono||"-"]]
   ];
   if(d.obra || d.ref) filasCaja.push([["Obra", d.obra||"-"], ["Ref. cot.", d.ref||"-"]]);
-  const boxH = lh*filasCaja.length + 4;
-  if(color){ doc.setFillColor(...azulFondo); doc.rect(M, y, ANCHO, boxH, "F"); }
-  doc.setDrawColor(...(color?azul:negro)); doc.setLineWidth(color?0.35:0.25);
-  doc.rect(M, y, ANCHO, boxH);
-  doc.setFontSize(10); doc.setTextColor(...negro);
-  const colB = M + (ANCHO*0.62);
-  filasCaja.forEach(([izq, der], i)=>{
-    const yy = y + lh*(i+1);
-    doc.setFont("helvetica","bold"); doc.text(izq[0], M+3, yy);
-    doc.setFont("helvetica","normal"); doc.text(doc.splitTextToSize(": " + izq[1], colB - (M+24) - 3)[0], M+24, yy);
-    doc.setFont("helvetica","bold"); doc.text(der[0], colB, yy);
-    doc.setFont("helvetica","normal"); doc.text(doc.splitTextToSize(": " + der[1], PAG_W - M - (colB+17) - 2)[0], colB+17, yy);
-  });
+  let y2 = cajaDatosPDF(doc, filasCaja, y, o, S);
 
   // ---- Tabla de items ----
   const filas = itemsOC.map((it,idx)=>[
@@ -1312,115 +1351,50 @@ function descargarPDF_OC(modo){
     formatoCLP(it.precio),
     formatoCLP(it.cantidad*it.precio)
   ]);
-  doc.autoTable({
-    startY: y+boxH+6,
-    head: [["Ítem","Producto","Unidad","Cant.","Precio Unit. ($)","Total ($)"]],
-    body: filas,
-    styles:{ font:"helvetica", fontSize:9.5, textColor: negro, lineColor: color?[210,218,226]:[190,190,190], lineWidth:0.15, cellPadding:2.6 },
-    headStyles: color ? { fillColor: azulOsc, textColor:[255,255,255], fontStyle:"bold", fontSize:9 }
-                       : { fillColor:[255,255,255], textColor: negro, fontStyle:"bold", lineWidth:0.3, lineColor:[0,0,0], fontSize:9 },
-    alternateRowStyles: color ? { fillColor:[246,249,252] } : { fillColor:[255,255,255] },
-    columnStyles:{ 0:{cellWidth:13, halign:"center"}, 1:{cellWidth:82}, 2:{cellWidth:16, halign:"center"}, 3:{cellWidth:16, halign:"center"}, 4:{cellWidth:29, halign:"right"}, 5:{cellWidth:29, halign:"right"} },
-    margin:{left:M, right:M, bottom:18}
-  });
-
-  let y2 = asegurarEspacio(doc.lastAutoTable.finalY + 6, 26);
-  if(y2 === 22) y2 += 6;
+  y2 = tablaItemsPDF(doc, filas, y2 + 3 + 3*S, "Precio Unit. ($)", o, S);
 
   // ---- Totales ----
-  const anchoBox = 78, padBox = 5;
-  const boxRight = PAG_W - M, boxLeft = boxRight - anchoBox;
-  if(color){ doc.setFillColor(...azulFondo); doc.rect(boxLeft, y2-6, anchoBox, 25, "F"); }
-  doc.setFont("helvetica","normal"); doc.setFontSize(10); doc.setTextColor(...negro);
-  doc.text("Total Neto $", boxLeft+padBox, y2); doc.text(formatoCLP(neto), boxRight-padBox, y2, {align:"right"});
-  doc.text("19% IVA", boxLeft+padBox, y2+6); doc.text(formatoCLP(iva), boxRight-padBox, y2+6, {align:"right"});
-  doc.setDrawColor(...(color?azul:negro)); doc.setLineWidth(0.4);
-  doc.line(boxLeft+padBox-2, y2+9, boxRight-padBox, y2+9);
-  doc.setFont("helvetica","bold"); doc.setFontSize(13);
-  doc.setTextColor(...(color?azulOsc:negro));
-  doc.text("TOTAL $", boxLeft+padBox, y2+16); doc.text(formatoCLP(total), boxRight-padBox, y2+16, {align:"right"});
-  doc.setFont("helvetica","normal"); doc.setTextColor(...negro); doc.setFontSize(10);
-  y2 += 26;
+  y2 = o.asegurarEspacio(y2, 22);
+  y2 = totalesPDF(doc, y2, calcularTotalesOC(), o, S);
 
   // ---- Condiciones de la compra ----
-  const condiciones = [
+  y2 = tituloSeccionPDF(doc, "CONDICIONES DE LA COMPRA", o.asegurarEspacio(y2, 14), o, S);
+  y2 = listaCondicionesPDF(doc, [
     ["Fecha / plazo de entrega", d.plazo || "-"],
     ["Lugar de entrega", d.lugar || "-"],
     ["Condiciones de pago", d.pago || "-"]
-  ];
-  y2 = asegurarEspacio(y2, 20);
-  doc.setFont("helvetica","bold"); doc.setFontSize(11.5);
-  doc.setTextColor(...(color?azulOsc:negro));
-  doc.text("CONDICIONES DE LA COMPRA", M, y2);
-  doc.setDrawColor(...rojo); doc.setLineWidth(0.5);
-  doc.line(M, y2+2, M+70, y2+2);
-  doc.setTextColor(...negro); doc.setFontSize(9.5);
-  y2 += 8;
-  condiciones.forEach(([label, valor])=>{
-    const texto = doc.splitTextToSize(valor, 138);
-    y2 = asegurarEspacio(y2, 5.6*texto.length);
-    doc.setFont("helvetica","bold"); doc.text(label, M, y2);
-    doc.setFont("helvetica","normal"); doc.text(":", M+46, y2);
-    doc.text(texto, M+50, y2);
-    y2 += 5.6 * texto.length + 1.2;
-  });
+  ], y2, o, S);
 
-  // ---- Comentarios u observaciones ----
-  if(d.obs) y2 = dibujarObservacionesPDF(doc, d.obs, y2 + 3, {M, ANCHO, color, azulOsc, rojo, negro, asegurarEspacio});
+  // ---- Comentarios ----
+  if(d.obs) y2 = dibujarObservacionesPDF(doc, d.obs, y2 + 1 + 2*S, o, S);
 
   // ---- Datos de facturación ----
-  y2 = asegurarEspacio(y2 + 3, 15);
-  if(color){ doc.setFillColor(248,249,250); doc.rect(M, y2, ANCHO, 15, "F"); }
-  doc.setDrawColor(...(color?azul:negro)); doc.setLineWidth(0.25);
-  doc.rect(M, y2, ANCHO, 15);
-  doc.setFontSize(9);
-  doc.setFont("helvetica","bold"); doc.text("Facturar a nombre de:", M+3, y2+6);
-  doc.setFont("helvetica","normal"); doc.text(EMPRESA.rutEmpresa, M+3, y2+11.5);
-  doc.setFont("helvetica","bold"); doc.text("Enviar factura a:", M+ANCHO*0.55, y2+6);
-  doc.setFont("helvetica","normal"); doc.text(d.correoFactura, M+ANCHO*0.55, y2+11.5);
+  y2 = recuadroDatosPDF(doc, y2 + 1 + 2*S,
+    ["Facturar a nombre de:", EMPRESA.rutEmpresa],
+    ["Enviar factura a:", d.correoFactura], o, S);
 
-  y2 += 23;
-  y2 = asegurarEspacio(y2, 12);
-  doc.setFontSize(9.5);
+  // ---- Nota y firma ----
+  const lh = 3.8 + 1*S;
+  y2 += 4 + 4*S;
+  doc.setFont("helvetica","normal"); doc.setFontSize(8 + 1.5*S); doc.setTextColor(...o.negro);
   const nota = doc.splitTextToSize(
-    "Favor indicar el N° " + d.numero + " en la factura y guía de despacho. Ante cualquier consulta, contactar a " + EMPRESA.correoComprobante + "   ·   Teléfonos: " + EMPRESA.telefonos, ANCHO);
-  doc.text(nota, M, y2);
-  y2 += 5.6 * nota.length + 13;
+    "Favor indicar el N° " + d.numero + " en la factura y guía de despacho. Ante cualquier consulta, contactar a " + EMPRESA.correoComprobante + "   ·   Teléfonos: " + EMPRESA.telefonos, o.ANCHO);
+  y2 = o.asegurarEspacio(y2, lh*nota.length);
+  doc.text(nota, o.M, y2);
+  y2 += lh * nota.length + 6 + 7*S;
 
-  // ---- Firma ----
-  y2 = asegurarEspacio(y2, 13);
-  doc.setDrawColor(...(color?azul:negro)); doc.setLineWidth(0.3);
-  doc.line(M, y2, M+70, y2);
-  doc.setFont("helvetica","bold"); doc.setFontSize(10.5);
-  doc.text(d.solicitante, M, y2+5.5);
-  doc.setFont("helvetica","normal"); doc.setFontSize(9.5);
-  if(color) doc.setTextColor(...azul);
-  doc.text("SKINTEC SPA  ·  WhatsApp: " + EMPRESA.whatsapp, M, y2+11);
-  doc.setTextColor(...negro);
+  y2 = o.asegurarEspacio(y2, 13);
+  doc.setDrawColor(...(o.color?o.azul:o.grisTxt)); doc.setLineWidth(o.color?0.3:0.2);
+  doc.line(o.M, y2, o.M+70, y2);
+  doc.setFont("helvetica","bold"); doc.setFontSize(9 + 1.5*S);
+  doc.text(d.solicitante, o.M, y2 + 4 + 1.5*S);
+  doc.setFont("helvetica","normal"); doc.setFontSize(8 + 1.5*S);
+  if(o.color) doc.setTextColor(...o.azul);
+  doc.text("SKINTEC SPA  ·  WhatsApp: " + EMPRESA.whatsapp, o.M, y2 + 8 + 3*S);
+  doc.setTextColor(...o.negro);
 
-  // ---- Pie de página con marca (en todas las páginas) ----
-  const nPag = doc.internal.getNumberOfPages();
-  for(let i=1; i<=nPag; i++){
-    doc.setPage(i);
-    if(color){
-      doc.setFillColor(...azulOsc);
-      doc.rect(0, PAG_H-10, PAG_W, 10, "F");
-      doc.setFontSize(8); doc.setTextColor(255,255,255);
-      doc.text("www.skintec.cl  ·  Protección pasiva contra incendios · Aislación térmica y acústica", PAG_W/2, PAG_H-4.5, {align:"center"});
-    } else {
-      doc.setFontSize(8); doc.setTextColor(...grisTxt);
-      doc.text("www.skintec.cl  ·  Protección pasiva contra incendios · Aislación térmica y acústica", PAG_W/2, PAG_H-6, {align:"center"});
-    }
-    if(nPag > 1){
-      doc.setFontSize(8); doc.setTextColor(...grisTxt);
-      doc.text("Página " + i + " de " + nPag, PAG_W - M, PAG_H-13, {align:"right"});
-    }
-  }
-
-  recordarProveedor(d);
-  const sanitizarNombre = (s) => String(s||"").replace(/[\\/:*?"<>|]/g,"").replace(/\s+/g," ").trim();
-  const baseArchivo = d.numero + " " + (sanitizarNombre(d.proveedor==="-" ? "" : d.proveedor) || "Proveedor");
-  doc.save(color ? (baseArchivo + ".pdf") : (baseArchivo + " (imprimir).pdf"));
+  pieDePaginaPDF(doc, o);
+  return doc;
 }
 
 function initOC(){
