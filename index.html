@@ -574,7 +574,8 @@ function nuevoItem(personalizado){
 }
 function agregarItem(personalizado){
   const it = nuevoItem(personalizado);
-  if(!personalizado){
+  if(personalizado) it.archivo = "Otro";
+  else {
     const archivos = archivosUnicos();
     it.archivo = archivos[0] || "";
     const cats = categoriasDeArchivo(it.archivo);
@@ -592,8 +593,23 @@ function quitarItem(uid){
   items = items.filter(i=>i.uid!==uid);
   renderItems();
 }
+/* Opción "Otro" en Archivo: línea libre con el texto del archivo editable */
+const ARCHIVO_OTRO = "__otro";
+function opcionesArchivo(it, archivos){
+  return archivos.map(a=>`<option value="${escapeAttr(a)}" ${!it.personalizado && it.archivo===a?'selected':''}>${escapeAttr(a)}</option>`).join("")
+    + `<option value="${ARCHIVO_OTRO}" ${it.personalizado?'selected':''}>Otro</option>`;
+}
 function onArchivoChange(uid, valor){
   const it = items.find(i=>i.uid===uid);
+  if(valor===ARCHIVO_OTRO){
+    it.personalizado = true; it.archivo = "Otro"; it.categoria = ""; it.productoId = "";
+    it.nombre = ""; it.formato = ""; it.precioBase = 0;
+    renderItems();
+    const inp = document.querySelector('tr[data-uid="'+uid+'"] .archivo-otro');
+    if(inp){ inp.focus(); inp.select(); }
+    return;
+  }
+  it.personalizado = false;
   it.archivo = valor;
   const cats = categoriasDeArchivo(valor);
   it.categoria = cats[0] || "";
@@ -654,7 +670,11 @@ function renderItems(){
     const pf = precioFinalDeItem(it);
     if(it.personalizado){
       tr.innerHTML = `
-        <td colspan="2"><span style="font-size:12px; color:var(--gris);">Personalizado</span></td>
+        <td>
+          <select onchange="onArchivoChange(${it.uid}, this.value)" style="margin-bottom:4px;">${opcionesArchivo(it, archivos)}</select>
+          <input type="text" class="archivo-otro" placeholder="Escribe el archivo" value="${escapeAttr(it.archivo)}" onchange="onCampoItem(${it.uid},'archivo',this.value)">
+        </td>
+        <td><input type="text" placeholder="Categoría (opcional)" value="${escapeAttr(it.categoria)}" onchange="onCampoItem(${it.uid},'categoria',this.value)"></td>
         <td>
           <input type="text" placeholder="Descripción del producto" value="${escapeAttr(it.nombre)}" onchange="onCampoItem(${it.uid},'nombre',this.value)" style="margin-bottom:4px;">
           <input type="text" placeholder="Formato (opcional)" value="${escapeAttr(it.formato)}" onchange="onCampoItem(${it.uid},'formato',this.value)">
@@ -675,9 +695,7 @@ function renderItems(){
       const opciones = productosDeCategoria(it.categoria);
       tr.innerHTML = `
         <td>
-          <select onchange="onArchivoChange(${it.uid}, this.value)">
-            ${archivos.map(a=>`<option value="${escapeAttr(a)}" ${it.archivo===a?'selected':''}>${escapeAttr(a)}</option>`).join("")}
-          </select>
+          <select onchange="onArchivoChange(${it.uid}, this.value)">${opcionesArchivo(it, archivos)}</select>
         </td>
         <td>
           <select onchange="onCategoriaChange(${it.uid}, this.value)">
