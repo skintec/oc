@@ -275,11 +275,12 @@
   <div class="card">
     <h2>2 · Productos solicitados <span class="h2-extra">Precio unitario neto de compra</span></h2>
     <div class="table-scroll">
-    <table class="items" style="min-width:900px;">
+    <table class="items" style="min-width:1000px;">
       <thead>
         <tr>
-          <th style="width:24%">Desde catálogo (opcional)</th>
-          <th style="width:30%">Producto / Formato</th>
+          <th style="width:11%">Archivo</th>
+          <th style="width:15%">Categoría</th>
+          <th style="width:28%">Producto / Formato</th>
           <th style="width:8%">Unidad</th>
           <th style="width:9%">Cantidad</th>
           <th style="width:12%">Precio Unit. ($)</th>
@@ -289,10 +290,10 @@
       </thead>
       <tbody id="oc_items_body"></tbody>
       <tfoot>
-        <tr><td colspan="5" style="text-align:right;">Total Neto</td><td id="oc_t_neto">$0</td><td></td></tr>
-        <tr><td colspan="5" style="text-align:right;">19% IVA</td><td id="oc_t_iva">$0</td><td></td></tr>
+        <tr><td colspan="6" style="text-align:right;">Total Neto</td><td id="oc_t_neto">$0</td><td></td></tr>
+        <tr><td colspan="6" style="text-align:right;">19% IVA</td><td id="oc_t_iva">$0</td><td></td></tr>
         <tr>
-          <td colspan="5" style="text-align:right; color:var(--azul-oscuro); font-size:15px;">TOTAL</td>
+          <td colspan="6" style="text-align:right; color:var(--azul-oscuro); font-size:15px;">TOTAL</td>
           <td id="oc_t_total" style="color:var(--azul-oscuro); font-size:15px;">$0</td><td></td>
         </tr>
       </tfoot>
@@ -301,7 +302,7 @@
     <div class="fila-agregar">
       <button class="btn btn-outline btn-small" onclick="agregarItemOC()">+ Agregar producto</button>
     </div>
-    <p class="nota">Al elegir un producto del catálogo se completa con su <b>Precio Base</b> (costo) como precio unitario; puedes editar cualquier dato de la línea.</p>
+    <p class="nota">Al elegir un producto del catálogo se completa con su <b>Precio Base</b> (costo) como precio unitario; puedes editar cualquier dato de la línea. Elige <b>Otro</b> en Archivo para una línea libre.</p>
   </div>
 
   <!-- CONDICIONES -->
@@ -1239,7 +1240,42 @@ function onProveedorChange(nombre){
 }
 
 function agregarItemOC(){
-  itemsOC.push({uid: seqItemOC++, productoId:"", nombre:"", formato:"", unidad:"un", cantidad:1, precio:0});
+  const it = {uid: seqItemOC++, libre:false, archivo:"", categoria:"", productoId:"", nombre:"", formato:"", unidad:"un", cantidad:1, precio:0};
+  it.archivo = archivosUnicos()[0] || "";
+  it.categoria = categoriasDeArchivo(it.archivo)[0] || "";
+  aplicarPrimerProductoOC(it);
+  itemsOC.push(it);
+  renderItemsOC();
+}
+/* Carga en la línea un producto del catálogo (precio = Precio Base) */
+function aplicarProductoOC(it, p){
+  if(p){ it.productoId=p.id; it.nombre=p.nombre; it.formato=(p.formato && p.formato!=="-") ? p.formato : ""; it.unidad=p.unidad; it.precio=Math.round(Number(p.precioBase)||0); }
+  else { it.productoId=""; it.nombre=""; it.formato=""; it.unidad="un"; it.precio=0; }
+}
+function aplicarPrimerProductoOC(it){
+  aplicarProductoOC(it, productosDeCategoria(it.categoria)[0]);
+}
+function onArchivoOCChange(uid, valor){
+  const it = itemsOC.find(i=>i.uid===uid);
+  if(!it) return;
+  if(valor===ARCHIVO_OTRO){
+    it.libre = true; it.archivo = "Otro"; it.categoria = "";
+    aplicarProductoOC(it, null);
+    renderItemsOC();
+    const inp = document.querySelector('tr[data-oc-uid="'+uid+'"] .archivo-otro');
+    if(inp){ inp.focus(); inp.select(); }
+    return;
+  }
+  it.libre = false; it.archivo = valor;
+  it.categoria = categoriasDeArchivo(valor)[0] || "";
+  aplicarPrimerProductoOC(it);
+  renderItemsOC();
+}
+function onCategoriaOCChange(uid, valor){
+  const it = itemsOC.find(i=>i.uid===uid);
+  if(!it) return;
+  it.categoria = valor;
+  aplicarPrimerProductoOC(it);
   renderItemsOC();
 }
 function quitarItemOC(uid){
@@ -1249,9 +1285,8 @@ function quitarItemOC(uid){
 function onProductoOCChange(uid, productoId){
   const it = itemsOC.find(i=>i.uid===uid);
   if(!it) return;
-  it.productoId = productoId;
   const p = catalogo.find(x=>x.id===productoId);
-  if(p){ it.nombre=p.nombre; it.formato=(p.formato && p.formato!=="-") ? p.formato : ""; it.unidad=p.unidad; it.precio=Math.round(Number(p.precioBase)||0); }
+  if(p) aplicarProductoOC(it, p);
   renderItemsOC();
 }
 function onCampoItemOC(uid, campo, valor){
@@ -1262,22 +1297,32 @@ function onCampoItemOC(uid, campo, valor){
   if(tr) tr.querySelector('.celda-total').textContent = formatoCLP(it.cantidad*it.precio);
   renderTotalesOC();
 }
-function opcionesCatalogoOC(seleccion){
-  const grupos = categoriasUnicas().map(cat=>
-    `<optgroup label="${escapeAttr(cat)}">` +
-    productosDeCategoria(cat).map(p=>`<option value="${p.id}" ${seleccion===p.id?'selected':''}>${escapeAttr(etiquetaProducto(p))}</option>`).join("") +
-    `</optgroup>`).join("");
-  return `<option value="">— Línea libre —</option>` + grupos;
-}
 function renderItemsOC(){
   const body = document.getElementById('oc_items_body');
   body.innerHTML = "";
+  const archivos = archivosUnicos();
   itemsOC.forEach(it=>{
     const tr = document.createElement('tr');
     tr.setAttribute('data-oc-uid', it.uid);
-    tr.innerHTML = `
-      <td><select onchange="onProductoOCChange(${it.uid}, this.value)">${opcionesCatalogoOC(it.productoId)}</select></td>
+    const selArchivo = `<select onchange="onArchivoOCChange(${it.uid}, this.value)"${it.libre?' style="margin-bottom:4px;"':''}>${opcionesArchivo({personalizado:it.libre, archivo:it.archivo}, archivos)}</select>`;
+    const celdasCatalogo = it.libre ? `
       <td>
+        ${selArchivo}
+        <input type="text" class="archivo-otro" placeholder="Escribe el archivo" value="${escapeAttr(it.archivo)}" onchange="onCampoItemOC(${it.uid},'archivo',this.value)">
+      </td>
+      <td><input type="text" placeholder="Categoría (opcional)" value="${escapeAttr(it.categoria)}" onchange="onCampoItemOC(${it.uid},'categoria',this.value)"></td>
+      <td>` : `
+      <td>${selArchivo}</td>
+      <td>
+        <select onchange="onCategoriaOCChange(${it.uid}, this.value)">
+          ${categoriasDeArchivo(it.archivo).map(c=>`<option value="${escapeAttr(c)}" ${it.categoria===c?'selected':''}>${escapeAttr(c)}</option>`).join("")}
+        </select>
+      </td>
+      <td>
+        <select onchange="onProductoOCChange(${it.uid}, this.value)" style="margin-bottom:4px;">
+          ${productosDeCategoria(it.categoria).map(p=>`<option value="${p.id}" ${it.productoId===p.id?'selected':''}>${escapeAttr(etiquetaProducto(p))}</option>`).join("")}
+        </select>`;
+    tr.innerHTML = celdasCatalogo + `
         <input type="text" placeholder="Nombre del producto" value="${escapeAttr(it.nombre)}" onchange="onCampoItemOC(${it.uid},'nombre',this.value)" style="margin-bottom:4px;">
         <input type="text" placeholder="Formato (opcional)" value="${escapeAttr(it.formato)}" onchange="onCampoItemOC(${it.uid},'formato',this.value)">
       </td>
