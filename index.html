@@ -250,13 +250,12 @@
   <!-- DATOS DE LA ORDEN DE COMPRA -->
   <div class="card">
     <h2>1 · Datos de la orden de compra</h2>
-    <div class="grid cols-4">
+    <div class="grid cols-3">
       <div><label>N° Orden de compra</label><input type="text" id="oc_numero"></div>
       <div><label>Fecha</label><input type="date" id="oc_fecha"></div>
       <div><label>Solicitado por</label>
         <input type="text" id="oc_solicitante" list="lista_vendedores" placeholder="Nombre de quien compra">
       </div>
-      <div><label>Ref. cotización proveedor</label><input type="text" id="oc_ref" placeholder="Ej: Cot. N° 1234"></div>
     </div>
     <div class="grid cols-2" style="margin-top:14px;">
       <div style="grid-column:1 / -1;"><label>Proveedor frecuente (rellena los datos automáticamente)</label>
@@ -268,9 +267,7 @@
       </div>
       <div><label>RUT proveedor</label><input type="text" id="oc_rut" placeholder="Ej: 76.123.456-7"></div>
       <div><label>Contacto</label><input type="text" id="oc_contacto" placeholder="Ej: Sr(a). Nombre Apellido"></div>
-      <div><label>Correo</label><input type="email" id="oc_correo" placeholder="correo@proveedor.cl"></div>
-      <div><label>Teléfono</label><input type="text" id="oc_telefono" placeholder="+56 9 ..."></div>
-      <div><label>Obra / Proyecto (opcional)</label><input type="text" id="oc_obra" placeholder="Ej: Edificio Los Aromos"></div>
+      <div><label>Correo (no se imprime en el PDF)</label><input type="email" id="oc_correo" placeholder="correo@proveedor.cl"></div>
     </div>
   </div>
 
@@ -311,9 +308,14 @@
   <div class="card">
     <h2>3 · Condiciones de la compra</h2>
     <div class="grid cols-2">
-      <div><label>Fecha / plazo de entrega</label><input type="text" id="oc_plazo" placeholder="Ej: 30/09/26 o 3 días hábiles"></div>
-      <div><label>Lugar de entrega / despacho</label><input type="text" id="oc_lugar" placeholder="Dirección de despacho o retiro en bodega proveedor"></div>
+      <div><label>Según oferta (ref. cotización proveedor)</label><input type="text" id="oc_ref" placeholder="Ej: Cot. N° 1234"></div>
       <div><label>Condiciones de pago</label><input type="text" id="oc_pago" value="Transferencia bancaria contra factura."></div>
+      <div><label>Fecha / plazo de entrega</label><input type="text" id="oc_plazo" placeholder="Ej: 30/09/26 o 3 días hábiles"></div>
+      <div><label>Lugar de entrega</label><input type="text" id="oc_lugar" placeholder="Ej: Despacho a obra o retiro en bodega proveedor"></div>
+      <div><label>Dirección</label><input type="text" id="oc_direccion" placeholder="Ej: Av. Ejemplo 1234, Santiago"></div>
+      <div><label>Contratista</label><input type="text" id="oc_contratista" placeholder="Ej: Constructora Ejemplo Ltda."></div>
+      <div><label>Obra</label><input type="text" id="oc_obra" placeholder="Ej: Edificio Los Aromos"></div>
+      <div><label>Teléfono</label><input type="text" id="oc_telefono" placeholder="+56 9 ..."></div>
       <div><label>Enviar factura a</label><input type="email" id="oc_correo_factura" value="ventas@skintec.cl"></div>
     </div>
     <div style="margin-top:14px;"><label>Datos de facturación (se incluyen fijos en el PDF)</label>
@@ -1182,7 +1184,7 @@ function renderSelectProveedores(){
 }
 function onProveedorSelect(valor){
   if(valor==="") return;
-  const campos = ['oc_proveedor','oc_rut','oc_contacto','oc_correo','oc_telefono'];
+  const campos = ['oc_proveedor','oc_rut','oc_contacto','oc_correo'];
   if(valor==="nuevo"){
     campos.forEach(id=>document.getElementById(id).value="");
     document.getElementById('oc_proveedor').focus();
@@ -1196,7 +1198,6 @@ function onProveedorSelect(valor){
   document.getElementById('oc_rut').value = p.rut;
   document.getElementById('oc_contacto').value = p.contacto;
   document.getElementById('oc_correo').value = r.correo || "";
-  document.getElementById('oc_telefono').value = r.telefono || "";
 }
 
 /* N° OC: OC-AAMMDD-NN (NN = correlativo del día, independiente de las cotizaciones) */
@@ -1222,7 +1223,7 @@ function renderListaProveedores(){
 function recordarProveedor(d){
   if(!d.proveedor || d.proveedor==="-") return;
   const lista = cargarProveedores().filter(p=>p.nombre.toLowerCase()!==d.proveedor.toLowerCase());
-  lista.unshift({nombre:d.proveedor, rut:d.rut, contacto:d.contacto, correo:d.correo, telefono:d.telefono});
+  lista.unshift({nombre:d.proveedor, rut:d.rut, contacto:d.contacto, correo:d.correo});
   try{ localStorage.setItem(LS_PROVEEDORES, JSON.stringify(lista.slice(0,50))); }catch(e){}
   renderListaProveedores();
 }
@@ -1235,7 +1236,6 @@ function onProveedorChange(nombre){
   document.getElementById('oc_rut').value = p.rut || "";
   document.getElementById('oc_contacto').value = p.contacto || "";
   document.getElementById('oc_correo').value = p.correo || "";
-  document.getElementById('oc_telefono').value = p.telefono || "";
 }
 
 function agregarItemOC(){
@@ -1318,6 +1318,8 @@ function datosFormularioOC(){
     correo: v('oc_correo'),
     telefono: v('oc_telefono'),
     obra: v('oc_obra'),
+    direccion: v('oc_direccion'),
+    contratista: v('oc_contratista'),
     plazo: v('oc_plazo'),
     lugar: v('oc_lugar'),
     pago: v('oc_pago'),
@@ -1327,7 +1329,7 @@ function datosFormularioOC(){
 }
 function nuevaOC(){
   if(!confirm("¿Limpiar todos los datos y empezar una nueva orden de compra?")) return;
-  ["oc_ref","oc_proveedor","oc_rut","oc_contacto","oc_correo","oc_telefono","oc_obra","oc_plazo","oc_lugar","oc_obs"]
+  ["oc_ref","oc_proveedor","oc_rut","oc_contacto","oc_correo","oc_telefono","oc_obra","oc_direccion","oc_contratista","oc_plazo","oc_lugar","oc_obs"]
     .forEach(id=>document.getElementById(id).value="");
   document.getElementById('oc_proveedor_sel').value = "";
   document.getElementById('oc_fecha').value = hoyISO();
@@ -1354,10 +1356,8 @@ function construirPDF_OC(d, modo, S){
   // ---- Caja datos proveedor ----
   const filasCaja = [
     [["Proveedor", d.proveedor], ["RUT", d.rut||"-"]],
-    [["Contacto", d.contacto||"-"], ["Fecha", d.fecha]],
-    [["Correo", d.correo||"-"], ["Teléfono", d.telefono||"-"]]
+    [["Contacto", d.contacto||"-"], ["Fecha", d.fecha]]
   ];
-  if(d.obra || d.ref) filasCaja.push([["Obra", d.obra||"-"], ["Ref. cot.", d.ref||"-"]]);
   let y2 = cajaDatosPDF(doc, filasCaja, y, o, S);
 
   // ---- Tabla de items ----
@@ -1377,11 +1377,17 @@ function construirPDF_OC(d, modo, S){
 
   // ---- Condiciones de la compra ----
   y2 = tituloSeccionPDF(doc, "CONDICIONES DE LA COMPRA", o.asegurarEspacio(y2, 14), o, S);
+  // Orden pedido; los datos opcionales vacíos no se imprimen
   y2 = listaCondicionesPDF(doc, [
+    d.ref ? ["Según oferta", d.ref] : null,
+    ["Condiciones de pago", d.pago || "-"],
     ["Fecha / plazo de entrega", d.plazo || "-"],
     ["Lugar de entrega", d.lugar || "-"],
-    ["Condiciones de pago", d.pago || "-"]
-  ], y2, o, S);
+    d.direccion ? ["Dirección", d.direccion] : null,
+    d.contratista ? ["Contratista", d.contratista] : null,
+    d.obra ? ["Obra", d.obra] : null,
+    d.telefono ? ["Teléfono", d.telefono] : null
+  ].filter(Boolean), y2, o, S);
 
   // ---- Comentarios ----
   if(d.obs) y2 = dibujarObservacionesPDF(doc, d.obs, y2 + 1 + 2*S, o, S);
@@ -1391,15 +1397,8 @@ function construirPDF_OC(d, modo, S){
     ["Facturar a nombre de:", EMPRESA.rutEmpresa],
     ["Enviar factura a:", d.correoFactura], o, S);
 
-  // ---- Nota y firma ----
-  const lh = 3.8 + 1*S;
-  y2 += 4 + 4*S;
-  doc.setFont("helvetica","normal"); doc.setFontSize(8 + 1.5*S); doc.setTextColor(...o.negro);
-  const nota = doc.splitTextToSize(
-    "Favor indicar el N° " + d.numero + " en la factura y guía de despacho. Ante cualquier consulta, contactar a " + EMPRESA.correoComprobante + "   ·   Teléfonos: " + EMPRESA.telefonos, o.ANCHO);
-  y2 = o.asegurarEspacio(y2, lh*nota.length);
-  doc.text(nota, o.M, y2);
-  y2 += lh * nota.length + 6 + 7*S;
+  // ---- Firma ----
+  y2 += 10 + 11*S;
 
   y2 = o.asegurarEspacio(y2, 13);
   doc.setDrawColor(...(o.color?o.azul:o.grisTxt)); doc.setLineWidth(o.color?0.3:0.2);
