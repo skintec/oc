@@ -275,12 +275,13 @@
   <div class="card">
     <h2>2 · Productos solicitados <span class="h2-extra">Precio unitario neto de compra</span></h2>
     <div class="table-scroll">
-    <table class="items" style="min-width:1000px;">
+    <table class="items" style="min-width:1120px;">
       <thead>
         <tr>
-          <th style="width:11%">Archivo</th>
-          <th style="width:15%">Categoría</th>
-          <th style="width:28%">Producto / Formato</th>
+          <th style="width:12%">Área</th>
+          <th style="width:10%">Archivo</th>
+          <th style="width:14%">Categoría</th>
+          <th style="width:25%">Producto / Formato</th>
           <th style="width:8%">Unidad</th>
           <th style="width:9%">Cantidad</th>
           <th style="width:12%">Precio Unit. ($)</th>
@@ -290,10 +291,10 @@
       </thead>
       <tbody id="oc_items_body"></tbody>
       <tfoot>
-        <tr><td colspan="6" style="text-align:right;">Total Neto</td><td id="oc_t_neto">$0</td><td></td></tr>
-        <tr><td colspan="6" style="text-align:right;">19% IVA</td><td id="oc_t_iva">$0</td><td></td></tr>
+        <tr><td colspan="7" style="text-align:right;">Total Neto</td><td id="oc_t_neto">$0</td><td></td></tr>
+        <tr><td colspan="7" style="text-align:right;">19% IVA</td><td id="oc_t_iva">$0</td><td></td></tr>
         <tr>
-          <td colspan="6" style="text-align:right; color:var(--azul-oscuro); font-size:15px;">TOTAL</td>
+          <td colspan="7" style="text-align:right; color:var(--azul-oscuro); font-size:15px;">TOTAL</td>
           <td id="oc_t_total" style="color:var(--azul-oscuro); font-size:15px;">$0</td><td></td>
         </tr>
       </tfoot>
@@ -1239,8 +1240,35 @@ function onProveedorChange(nombre){
   document.getElementById('oc_correo').value = p.correo || "";
 }
 
+/* Las 3 áreas de producto de skintec.cl y qué archivos del catálogo pertenecen a cada una */
+const AREAS_PRODUCTO = [
+  {nombre:"Protección pasiva contra incendios",        archivos:["Promat"]},
+  {nombre:"Tabiques y cielos",                          archivos:["Volcanita"]},
+  {nombre:"Aislación térmica y absorbente acústico",   archivos:["Lanas"]}
+];
+/* Archivos disponibles para un área ("" = todas las áreas) */
+function archivosDeArea(area){
+  const todos = archivosUnicos();
+  const a = AREAS_PRODUCTO.find(x=>x.nombre===area);
+  return a ? todos.filter(f=>a.archivos.includes(f)) : todos;
+}
+function areaDeArchivo(archivo){
+  const a = AREAS_PRODUCTO.find(x=>x.archivos.includes(archivo));
+  return a ? a.nombre : "";
+}
+function onAreaOCChange(uid, valor){
+  const it = itemsOC.find(i=>i.uid===uid);
+  if(!it) return;
+  it.area = valor;
+  if(!it.libre){
+    it.archivo = archivosDeArea(valor)[0] || "";
+    it.categoria = categoriasDeArchivo(it.archivo)[0] || "";
+    aplicarPrimerProductoOC(it);
+  }
+  renderItemsOC();
+}
 function agregarItemOC(){
-  const it = {uid: seqItemOC++, libre:false, archivo:"", categoria:"", productoId:"", nombre:"", formato:"", unidad:"un", cantidad:1, precio:0};
+  const it = {uid: seqItemOC++, area:"", libre:false, archivo:"", categoria:"", productoId:"", nombre:"", formato:"", unidad:"un", cantidad:1, precio:0};
   it.archivo = archivosUnicos()[0] || "";
   it.categoria = categoriasDeArchivo(it.archivo)[0] || "";
   aplicarPrimerProductoOC(it);
@@ -1267,6 +1295,7 @@ function onArchivoOCChange(uid, valor){
     return;
   }
   it.libre = false; it.archivo = valor;
+  if(it.area && areaDeArchivo(valor)!==it.area) it.area = areaDeArchivo(valor);
   it.categoria = categoriasDeArchivo(valor)[0] || "";
   aplicarPrimerProductoOC(it);
   renderItemsOC();
@@ -1300,12 +1329,16 @@ function onCampoItemOC(uid, campo, valor){
 function renderItemsOC(){
   const body = document.getElementById('oc_items_body');
   body.innerHTML = "";
-  const archivos = archivosUnicos();
   itemsOC.forEach(it=>{
     const tr = document.createElement('tr');
     tr.setAttribute('data-oc-uid', it.uid);
+    const archivos = archivosDeArea(it.area);
+    const selArea = `<td><select onchange="onAreaOCChange(${it.uid}, this.value)">
+        <option value="">Todas</option>
+        ${AREAS_PRODUCTO.map(a=>`<option value="${escapeAttr(a.nombre)}" ${it.area===a.nombre?'selected':''}>${escapeAttr(a.nombre)}</option>`).join("")}
+      </select></td>`;
     const selArchivo = `<select onchange="onArchivoOCChange(${it.uid}, this.value)"${it.libre?' style="margin-bottom:4px;"':''}>${opcionesArchivo({personalizado:it.libre, archivo:it.archivo}, archivos)}</select>`;
-    const celdasCatalogo = it.libre ? `
+    const celdasCatalogo = selArea + (it.libre ? `
       <td>
         ${selArchivo}
         <input type="text" class="archivo-otro" placeholder="Escribe el archivo" value="${escapeAttr(it.archivo)}" onchange="onCampoItemOC(${it.uid},'archivo',this.value)">
@@ -1321,7 +1354,7 @@ function renderItemsOC(){
       <td>
         <select onchange="onProductoOCChange(${it.uid}, this.value)" style="margin-bottom:4px;">
           ${productosDeCategoria(it.categoria).map(p=>`<option value="${p.id}" ${it.productoId===p.id?'selected':''}>${escapeAttr(etiquetaProducto(p))}</option>`).join("")}
-        </select>`;
+        </select>`);
     tr.innerHTML = celdasCatalogo + `
         <input type="text" placeholder="Nombre del producto" value="${escapeAttr(it.nombre)}" onchange="onCampoItemOC(${it.uid},'nombre',this.value)" style="margin-bottom:4px;">
         <input type="text" placeholder="Formato (opcional)" value="${escapeAttr(it.formato)}" onchange="onCampoItemOC(${it.uid},'formato',this.value)">
