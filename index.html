@@ -64,6 +64,7 @@
   .celda-base, .celda-total{font-variant-numeric:tabular-nums;}
   .celda-base{color:var(--gris);}
   .celda-final{font-weight:600; color:var(--azul-oscuro);}
+  input.in-final{font-weight:600; color:var(--azul-oscuro);}
 
   .btn{display:inline-flex; align-items:center; gap:8px; padding:11px 20px; border-radius:6px; font-size:14px; font-weight:600; border:none; cursor:pointer; font-family:inherit;}
   .btn-primary{background:var(--azul); color:#fff;}
@@ -172,7 +173,7 @@
       <label for="f_margen_global" style="margin:0;">% recargo por defecto</label>
       <input type="number" id="f_margen_global" value="10" min="0" step="0.5" onchange="onCambioMargenGlobal()">
       <button class="btn btn-outline btn-small" onclick="aplicarMargenATodas()">Aplicar a todas las líneas</button>
-      <span class="nota-inline">El precio base sale del catálogo (costo interno). El % de recargo se puede cambiar en cada línea. <b>En el PDF solo se ve el precio final</b>, nunca el precio base ni el %.</span>
+      <span class="nota-inline">El precio base sale del catálogo (costo interno) y, con el % de recargo, calcula el precio final. Todos los precios se pueden escribir a mano: si cambias el precio final o el total, el % se ajusta solo. <b>En el PDF solo se ve el precio final</b>, nunca el precio base ni el %.</span>
     </div>
 
     <div class="table-scroll">
@@ -550,6 +551,7 @@ function etiquetaProducto(p){
 
 /* ============ MARGEN / PRECIO FINAL ============ */
 function precioFinalDeItem(it){
+  if(it.precioFinalManual != null) return Number(it.precioFinalManual)||0;  // precio final escrito a mano
   const base = Number(it.precioBase)||0;
   const margen = Number(it.margen)||0;
   return Math.round(base * (1 + margen/100));
@@ -559,7 +561,7 @@ function onCambioMargenGlobal(){
   localStorage.setItem(LS_MARGEN_DEFAULT, String(margenGlobalDefault));
 }
 function aplicarMargenATodas(){
-  items.forEach(it=>{ it.margen = margenGlobalDefault; });
+  items.forEach(it=>{ it.margen = margenGlobalDefault; it.precioFinalManual = null; });
   renderItems();
   toast("Se aplicó " + margenGlobalDefault + "% a todas las líneas.");
 }
@@ -573,7 +575,8 @@ function nuevoItem(personalizado){
     categoria: "",
     productoId: "",
     nombre: "", formato:"", unidad:"un",
-    cantidad: 1, precioBase: 0, margen: margenGlobalDefault, precio: 0
+    cantidad: 1, precioBase: 0, margen: margenGlobalDefault, precio: 0,
+    precioFinalManual: null
   };
 }
 function agregarItem(personalizado){
@@ -587,7 +590,7 @@ function agregarItem(personalizado){
     const opciones = productosDeCategoria(it.categoria);
     if(opciones.length){
       const p = opciones[0];
-      it.productoId = p.id; it.nombre = p.nombre; it.formato = p.formato; it.unidad = p.unidad; it.precioBase = p.precioBase;
+      it.productoId = p.id; it.nombre = p.nombre; it.formato = p.formato; it.unidad = p.unidad; it.precioBase = p.precioBase; it.precioFinalManual = null;
     }
   }
   items.push(it);
@@ -620,9 +623,9 @@ function onArchivoChange(uid, valor){
   const opciones = productosDeCategoria(it.categoria);
   if(opciones.length){
     const p = opciones[0];
-    it.productoId = p.id; it.nombre = p.nombre; it.formato = p.formato; it.unidad = p.unidad; it.precioBase = p.precioBase;
+    it.productoId = p.id; it.nombre = p.nombre; it.formato = p.formato; it.unidad = p.unidad; it.precioBase = p.precioBase; it.precioFinalManual = null;
   } else {
-    it.productoId=""; it.nombre=""; it.formato=""; it.precioBase=0;
+    it.productoId=""; it.nombre=""; it.formato=""; it.precioBase=0; it.precioFinalManual=null;
   }
   renderItems();
 }
@@ -632,22 +635,36 @@ function onCategoriaChange(uid, valor){
   const opciones = productosDeCategoria(valor);
   if(opciones.length){
     const p = opciones[0];
-    it.productoId = p.id; it.nombre = p.nombre; it.formato = p.formato; it.unidad = p.unidad; it.precioBase = p.precioBase;
+    it.productoId = p.id; it.nombre = p.nombre; it.formato = p.formato; it.unidad = p.unidad; it.precioBase = p.precioBase; it.precioFinalManual = null;
   } else {
-    it.productoId=""; it.nombre=""; it.formato=""; it.precioBase=0;
+    it.productoId=""; it.nombre=""; it.formato=""; it.precioBase=0; it.precioFinalManual=null;
   }
   renderItems();
 }
 function onProductoChange(uid, productoId){
   const it = items.find(i=>i.uid===uid);
   const p = catalogo.find(x=>x.id===productoId);
-  if(p){ it.productoId=p.id; it.nombre=p.nombre; it.formato=p.formato; it.unidad=p.unidad; it.precioBase=p.precioBase; }
+  if(p){ it.productoId=p.id; it.nombre=p.nombre; it.formato=p.formato; it.unidad=p.unidad; it.precioBase=p.precioBase; it.precioFinalManual=null; }
   renderItems();
+}
+/* Precio base y % calculan el precio final; si se escribe el precio final o el total a mano,
+   ese valor manda y el % se ajusta para que calce con el precio base. */
+function fijarPrecioFinalManual(it, pf){
+  pf = Math.max(0, Math.round(Number(pf)||0));
+  it.precioFinalManual = pf;
+  const base = Number(it.precioBase)||0;
+  if(base > 0) it.margen = Math.round((pf/base - 1) * 10000) / 100;
 }
 function onCampoItem(uid, campo, valor){
   const it = items.find(i=>i.uid===uid);
   if(!it) return;
-  if(campo==="cantidad" || campo==="margen" || campo==="precio" || campo==="precioBase") it[campo] = Number(valor)||0;
+  if(campo==="precioFinal") fijarPrecioFinalManual(it, valor);
+  else if(campo==="total"){
+    const cant = Number(it.cantidad)||0;
+    if(cant > 0) fijarPrecioFinalManual(it, (Number(valor)||0) / cant);
+  }
+  else if(campo==="margen" || campo==="precioBase"){ it[campo] = Number(valor)||0; it.precioFinalManual = null; }
+  else if(campo==="cantidad" || campo==="precio") it[campo] = Number(valor)||0;
   else it[campo] = valor;
   actualizarFilaCalculada(uid);
   renderTotales();
@@ -658,12 +675,20 @@ function actualizarFilaCalculada(uid){
   const tr = document.querySelector('tr[data-uid="'+uid+'"]');
   if(!tr) return;
   const pf = precioFinalDeItem(it);
-  const celdaFinal = tr.querySelector('.celda-final');
-  const celdaTotal = tr.querySelector('.celda-total');
-  if(celdaFinal) celdaFinal.textContent = formatoCLP(pf);
-  if(celdaTotal) celdaTotal.textContent = formatoCLP((Number(it.cantidad)||0) * pf);
+  // Actualiza los campos calculados sin redibujar la fila (no se pierde el foco)
+  const poner = (sel, v)=>{ const el = tr.querySelector(sel); if(el && el!==document.activeElement) el.value = v; };
+  poner('.in-margen', it.margen);
+  poner('.in-final', pf);
+  poner('.in-total', Math.round((Number(it.cantidad)||0) * pf));
 }
 
+function celdasPrecioItem(it, pf){
+  return `
+        <td><input type="number" min="0" step="1" class="in-base" value="${it.precioBase}" onchange="onCampoItem(${it.uid},'precioBase',this.value)"></td>
+        <td><input type="number" step="0.5" class="in-margen" value="${it.margen}" onchange="onCampoItem(${it.uid},'margen',this.value)"></td>
+        <td><input type="number" min="0" step="1" class="in-final" value="${pf}" onchange="onCampoItem(${it.uid},'precioFinal',this.value)"></td>
+        <td><input type="number" min="0" step="1" class="in-total" value="${Math.round((Number(it.cantidad)||0)*pf)}" onchange="onCampoItem(${it.uid},'total',this.value)"></td>`;
+}
 function renderItems(){
   const body = document.getElementById('items_body');
   body.innerHTML = "";
@@ -689,10 +714,7 @@ function renderItems(){
           </select>
         </td>
         <td><input type="number" min="0" step="1" value="${it.cantidad}" onchange="onCampoItem(${it.uid},'cantidad',this.value)"></td>
-        <td><input type="number" min="0" step="1" value="${it.precioBase}" onchange="onCampoItem(${it.uid},'precioBase',this.value)"></td>
-        <td><input type="number" min="0" step="0.5" value="${it.margen}" onchange="onCampoItem(${it.uid},'margen',this.value)"></td>
-        <td class="celda-final">${formatoCLP(pf)}</td>
-        <td class="celda-total">${formatoCLP(it.cantidad*pf)}</td>
+        ${celdasPrecioItem(it, pf)}
         <td class="col-del"><button class="btn-del" onclick="quitarItem(${it.uid})" title="Quitar">✕</button></td>`;
     } else {
       const cats = categoriasDeArchivo(it.archivo);
@@ -719,10 +741,7 @@ function renderItems(){
           </select>
         </td>
         <td><input type="number" min="0" step="1" value="${it.cantidad}" onchange="onCampoItem(${it.uid},'cantidad',this.value)"></td>
-        <td class="celda-base">${formatoCLP(it.precioBase)}</td>
-        <td><input type="number" min="0" step="0.5" value="${it.margen}" onchange="onCampoItem(${it.uid},'margen',this.value)"></td>
-        <td class="celda-final">${formatoCLP(pf)}</td>
-        <td class="celda-total">${formatoCLP(it.cantidad*pf)}</td>
+        ${celdasPrecioItem(it, pf)}
         <td class="col-del"><button class="btn-del" onclick="quitarItem(${it.uid})" title="Quitar">✕</button></td>`;
     }
     body.appendChild(tr);
@@ -1321,9 +1340,18 @@ function onProductoOCChange(uid, productoId){
 function onCampoItemOC(uid, campo, valor){
   const it = itemsOC.find(i=>i.uid===uid);
   if(!it) return;
-  it[campo] = (campo==="cantidad" || campo==="precio") ? (Number(valor)||0) : valor;
+  if(campo==="total"){
+    // total escrito a mano: se recalcula el precio unitario
+    const cant = Number(it.cantidad)||0;
+    if(cant > 0) it.precio = Math.max(0, Math.round((Number(valor)||0) / cant));
+  }
+  else it[campo] = (campo==="cantidad" || campo==="precio") ? (Number(valor)||0) : valor;
   const tr = document.querySelector('tr[data-oc-uid="'+uid+'"]');
-  if(tr) tr.querySelector('.celda-total').textContent = formatoCLP(it.cantidad*it.precio);
+  if(tr){
+    const poner = (sel, v)=>{ const el = tr.querySelector(sel); if(el && el!==document.activeElement) el.value = v; };
+    poner('.in-precio', it.precio);
+    poner('.in-total', Math.round((Number(it.cantidad)||0)*(Number(it.precio)||0)));
+  }
   renderTotalesOC();
 }
 function renderItemsOC(){
@@ -1365,8 +1393,8 @@ function renderItemsOC(){
         </select>
       </td>
       <td><input type="number" min="0" step="1" value="${it.cantidad}" onchange="onCampoItemOC(${it.uid},'cantidad',this.value)"></td>
-      <td><input type="number" min="0" step="1" value="${it.precio}" onchange="onCampoItemOC(${it.uid},'precio',this.value)"></td>
-      <td class="celda-total celda-final">${formatoCLP(it.cantidad*it.precio)}</td>
+      <td><input type="number" min="0" step="1" class="in-precio" value="${it.precio}" onchange="onCampoItemOC(${it.uid},'precio',this.value)"></td>
+      <td><input type="number" min="0" step="1" class="in-total" value="${Math.round((Number(it.cantidad)||0)*(Number(it.precio)||0))}" onchange="onCampoItemOC(${it.uid},'total',this.value)"></td>
       <td class="col-del"><button class="btn-del" onclick="quitarItemOC(${it.uid})" title="Quitar">✕</button></td>`;
     body.appendChild(tr);
   });
