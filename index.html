@@ -275,6 +275,13 @@
   <!-- PRODUCTOS -->
   <div class="card">
     <h2>2 · Productos solicitados <span class="h2-extra">Precio unitario neto de compra</span></h2>
+    <div style="display:flex;align-items:flex-start;gap:10px;margin:12px 0 10px;padding:10px 12px;border:1px solid var(--gris-claro);border-radius:6px;background:#fafafa;">
+      <label style="display:flex;align-items:center;gap:8px;margin:0;font-weight:600;color:var(--azul-oscuro);cursor:pointer;">
+        <input type="checkbox" id="oc_modo_auto" checked onchange="cambiarModoAutoOC(this.checked)">
+        Ajustar precios automáticamente
+      </label>
+      <span style="font-size:12px;color:var(--gris);">Desactivado permite editar el total de cada línea sin modificar el precio unitario.</span>
+    </div>
     <div class="table-scroll">
     <table class="items" style="min-width:1120px;">
       <thead>
@@ -1184,6 +1191,22 @@ const LS_CONTADOR_OC_PREFIX = "skintec_oc_contador_";
 const LS_PROVEEDORES = "skintec_oc_proveedores_v1";
 let itemsOC = [];
 let seqItemOC = 1;
+let modoAutoOC = true;
+
+function cambiarModoAutoOC(activado){
+  modoAutoOC = !!activado;
+  if(modoAutoOC){
+    itemsOC.forEach(it => { it.totalManual = null; });
+  }
+  renderItemsOC();
+}
+
+function totalLineaOC(it){
+  if(!modoAutoOC && it.totalManual !== null && it.totalManual !== undefined && Number.isFinite(Number(it.totalManual))){
+    return Math.max(0, Math.round(Number(it.totalManual)));
+  }
+  return Math.round((Number(it.cantidad)||0) * (Number(it.precio)||0));
+}
 
 /* Proveedores frecuentes: al elegirlos se rellenan razón social, RUT y contacto */
 const PROVEEDORES_FIJOS = [
@@ -1296,6 +1319,7 @@ function agregarItemOC(){
 }
 /* Carga en la línea un producto del catálogo (precio = Precio Base) */
 function aplicarProductoOC(it, p){
+  it.totalManual = null;
   if(p){ it.productoId=p.id; it.nombre=p.nombre; it.formato=(p.formato && p.formato!=="-") ? p.formato : ""; it.unidad=p.unidad; it.precio=Math.round(Number(p.precioBase)||0); }
   else { it.productoId=""; it.nombre=""; it.formato=""; it.unidad="un"; it.precio=0; }
 }
@@ -1340,17 +1364,27 @@ function onProductoOCChange(uid, productoId){
 function onCampoItemOC(uid, campo, valor){
   const it = itemsOC.find(i=>i.uid===uid);
   if(!it) return;
+
   if(campo==="total"){
-    // total escrito a mano: se recalcula el precio unitario
-    const cant = Number(it.cantidad)||0;
-    if(cant > 0) it.precio = Math.max(0, Math.round((Number(valor)||0) / cant));
+    const total = Math.max(0, Math.round(Number(valor)||0));
+    if(modoAutoOC){
+      // Modo automático: el total modifica el precio unitario.
+      const cant = Number(it.cantidad)||0;
+      if(cant > 0) it.precio = Math.max(0, Math.round(total / cant));
+      it.totalManual = null;
+    }else{
+      // Modo manual: el total se conserva independiente del precio unitario.
+      it.totalManual = total;
+    }
+  }else{
+    it[campo] = (campo==="cantidad" || campo==="precio") ? (Number(valor)||0) : valor;
   }
-  else it[campo] = (campo==="cantidad" || campo==="precio") ? (Number(valor)||0) : valor;
+
   const tr = document.querySelector('tr[data-oc-uid="'+uid+'"]');
   if(tr){
     const poner = (sel, v)=>{ const el = tr.querySelector(sel); if(el && el!==document.activeElement) el.value = v; };
     poner('.in-precio', it.precio);
-    poner('.in-total', Math.round((Number(it.cantidad)||0)*(Number(it.precio)||0)));
+    poner('.in-total', totalLineaOC(it));
   }
   renderTotalesOC();
 }
@@ -1394,14 +1428,14 @@ function renderItemsOC(){
       </td>
       <td><input type="number" min="0" step="1" value="${it.cantidad}" onchange="onCampoItemOC(${it.uid},'cantidad',this.value)"></td>
       <td><input type="number" min="0" step="1" class="in-precio" value="${it.precio}" onchange="onCampoItemOC(${it.uid},'precio',this.value)"></td>
-      <td><input type="number" min="0" step="1" class="in-total" value="${Math.round((Number(it.cantidad)||0)*(Number(it.precio)||0))}" onchange="onCampoItemOC(${it.uid},'total',this.value)"></td>
+      <td><input type="number" min="0" step="1" class="in-total" value="${totalLineaOC(it)}" onchange="onCampoItemOC(${it.uid},'total',this.value)"></td>
       <td class="col-del"><button class="btn-del" onclick="quitarItemOC(${it.uid})" title="Quitar">✕</button></td>`;
     body.appendChild(tr);
   });
   renderTotalesOC();
 }
 function calcularTotalesOC(){
-  const neto = itemsOC.reduce((a,i)=>a + Math.round((Number(i.cantidad)||0)*(Number(i.precio)||0)), 0);
+  const neto = itemsOC.reduce((a,i)=>a + totalLineaOC(i), 0);
   const iva = Math.round(neto*0.19);
   return {neto, iva, total: neto+iva};
 }
@@ -1473,7 +1507,7 @@ function construirPDF_OC(d, modo, S){
     it.unidad,
     String(it.cantidad),
     formatoCLP(it.precio),
-    formatoCLP(it.cantidad*it.precio)
+    formatoCLP(totalLineaOC(it))
   ]);
   y2 = tablaItemsPDF(doc, filas, y2 + 3 + 3*S, "Precio Unit. ($)", o, S);
 
